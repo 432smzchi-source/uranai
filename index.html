@@ -716,11 +716,12 @@ function run(){
   const pillars=[["年柱",r.year],["月柱",r.month],["日柱",r.day]];
   if(r.hour)pillars.push(["時柱",r.hour]);
 
-  const yinCols=[["日柱",r.day],["月柱",r.month],["年柱",r.year]];
+  const yinBase=[["日柱",r.day],["月柱",r.month],["年柱",r.year]];
+  const yinCols=r.hour?[["時柱",r.hour],...yinBase]:yinBase;
   const ijo=p=>isIjoKanshi(p.k);
   const yoZo=p=>{const list=ZOUKAN_T[BRANCHES[p.branch]].map(x=>x[1]);return list.filter(s=>s!==p.zo);};
   let gogyo={"木":0,"火":0,"土":0,"金":0,"水":0};
-  yinCols.forEach(c=>{gogyo[ELEM_STEM[c[1].stem]]++;gogyo[ELEM_BRANCH[c[1].branch]]++;});
+  yinBase.forEach(c=>{gogyo[ELEM_STEM[c[1].stem]]++;gogyo[ELEM_BRANCH[c[1].branch]]++;});
   let mei='<div class="card"><h2>命式（陰占）</h2><p class="muted">入力：'+r.input+' ／ 立春基準年：'+r.solarYear+'年 ／ 経過日数：'+r.keika+'日（節入りから） ／ '+(male?"男性":"女性")+'</p>'
     +'<table><tr><th>No.</th>'+yinCols.map(c=>'<th>'+c[0]+'</th>').join('')+'</tr>'
     +'<tr><td class="muted">干支番号</td>'+yinCols.map(c=>'<td>'+kanshiNo(c[1].stem,c[1].branch)+'</td>').join('')+'</tr>'
@@ -735,7 +736,7 @@ function run(){
     +'<p style="margin-top:4px"><b>位相法：</b> '+isouhou(r)+'</p>'
     +'<p style="margin-top:4px"><b>十二支の刑冲破害：</b> '+juunishiKankei(r)+'</p>'
     +'<div style="margin-top:6px"><b style="font-size:.9rem">命式図（線で結ぶ）</b><div style="font-size:.74rem;margin-top:2px"><span style="color:#3a6ab0">━干合</span>　<span style="color:#3a7c5a">━三合</span>　<span style="color:#2a9d8f">━合</span>　<span style="color:#7a3aa0">━刑</span>　<span style="color:#c0392b">━冲</span>　<span style="color:#d98a2b">━破</span>　<span style="color:#b03a7a">━害</span></div>'+meishikiLines(r)+'</div>'
-    +'<p class="hint">列は日柱・月柱・年柱の順。蔵干（元命）は節入りからの経過日数（定気法）で判定、余蔵干はその他の蔵干です。<span style="color:#d2342f">赤字</span>は異常干支。位相法は地支どうしの関係（支合・半会・対冲・刑・害・破）と天干の干合を表します。</p></div>';
+    +'<p class="hint">列は'+(r.hour?'時柱・':'')+'日柱・月柱・年柱の順'+(r.hour?'（時柱は出生時刻を入れた場合のみ表示。算命学では年・月・日の3柱を基本とし、陰占五行も3柱で集計します）':'')+'。蔵干（元命）は節入りからの経過日数（定気法）で判定、余蔵干はその他の蔵干です。<span style="color:#d2342f">赤字</span>は異常干支。位相法は地支どうしの関係（支合・半会・対冲・刑・害・破）と天干の干合を表します。</p></div>';
 
   const kei=keisha(r.honmei,r.getsumei,male);
   const yStarD=honmei(ty);const dchart=chartStars(yStarD);const _di=dchart.indexOf(r.honmei);const doukaiKyu=(r.honmei===yStarD||_di<0)?"中宮":KYU[_di];

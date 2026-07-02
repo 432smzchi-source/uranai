@@ -125,6 +125,19 @@
   </div>
   <div id="consult"></div>
   <div id="consultday"></div>
+
+  <div class="card">
+    <h2>今日の運勢（九星気学・日盤）</h2>
+    <p class="muted">あなたの生年月日（一番上の欄）をもとに、日盤からこの日の運気と吉方位・凶方位を見ます。日付は初期値が「今日」です。変えれば任意の日（祐気取りの日選びなど）も調べられます。</p>
+    <div class="row">
+      <div class="fld"><label>年（西暦）</label><input type="number" id="fy" min="1901" max="2100"></div>
+      <div class="fld"><label>月</label><input type="number" id="fm" min="1" max="12"></div>
+      <div class="fld"><label>日</label><input type="number" id="fd" min="1" max="31"></div>
+    </div>
+    <button class="go" onclick="todayFortune()">この日の運勢・吉方位を見る</button>
+    <button class="go" onclick="searchGoodDays()" style="background:#3a7c5a">この日から30日間の「吉方位に良い日」を探す</button>
+  </div>
+  <div id="today"></div>
 </div>
 
 <footer>
@@ -398,6 +411,237 @@ const DOUKAI_INFO={
  "乾宮":{r:"衰運 -1",d:"多忙でストレスがたまりやすい時期。強気・単独行動になりがちでプライドも高まる。目上の援助は得やすい。"},
  "中宮":{r:"盛運 +4",d:"物事が決着・完成し、過去の努力が実る中心的立場の時期。半面、振り出しに戻る面や独断（ワンマン）に注意。"}
 };
+/* ===== データソース区別（出典レジストリ） =====
+   判定・文言の出典を内部的に区別する仕組み。定数名→出典名。
+   UI表示時に srcBadge() でバッジ表示に使う（書物データと九星方位気学データの併存管理）。 */
+const DATA_SRC={
+ "DOUKAI_INFO":"実占の宝典",
+ "KEISHA_INFO":"八雲院・園田流",
+ "STAR_INFO":"既存書物データ",
+ "HIDOUKAI_INFO":"九星気学の標準解釈（同会法の応用）",
+ "KAIZA_UNSEI":"九星方位気学（田口二州・学研）Part7",
+ "HOUTOKU":"九星方位気学（田口二州・学研）Part5",
+ "KYOSATSU_INFO":"九星方位気学（田口二州・学研）Part3"
+};
+function srcBadge(key){const s=DATA_SRC[key];return s?'<span style="font-size:.62rem;color:#8a8276;border:1px solid #d9d2c4;border-radius:8px;padding:1px 6px;margin-left:4px;vertical-align:middle">出典：'+s+'</span>':'';}
+/* ===== 同会・被同会（汎用：年盤・月盤・日盤どの盤にも使える） =====
+   同会＝自分の星（本命星等）がその盤で回座している宮。
+   被同会＝自分の星の後天定位宮に回座してきた星（その星の気の影響を受ける）。 */
+function doukaiKyuOf(H,c){if(H===c)return "中宮";const i=chartStars(c).indexOf(H);return i<0?"中宮":KYU[i];}
+function hidoukaiStar(H,c){if(H===5)return c;const i=BASE_BAN.indexOf(H);return i<0?c:chartStars(c)[i];}
+/* 被同会：定位宮に回座してきた星の気の影響（暫定文言＝標準的解釈。タスク2で『九星方位気学』の文言に差し替え） */
+const HIDOUKAI_INFO={
+ 1:"一白水星に被同会：悩みや停滞、水面下の動きの影響を受けやすいとき。冷静さと内省、秘めた準備が鍵になります。",
+ 2:"二黒土星に被同会：勤労・世話事の気を受けます。地道な努力が求められ、堅実に積み上げれば実りにつながります。",
+ 3:"三碧木星に被同会：活動・発展の気を受け、新しい話や情報が舞い込みやすいとき。勢いに乗る一方、早合点に注意。",
+ 4:"四緑木星に被同会：縁・信用が広がる気を受けます。交際や商談、遠方との話がまとまりやすくなります。",
+ 5:"五黄土星に被同会：強い波乱・停滞の気を受けます。無理な拡大は禁物。守りに徹し、腐れ縁や古い問題の整理を。",
+ 6:"六白金星に被同会：多忙・勝負の気を受けます。責任が増しますが、目上の引き立ても得やすいときです。",
+ 7:"七赤金星に被同会：金銭・楽しみ事の気を受けます。実りや交際の喜びの反面、浪費と口の災いに注意。",
+ 8:"八白土星に被同会：変化・改革の気を受けます。不動産・相続など家に関わる動きや、方向転換が起きやすいとき。",
+ 9:"九紫火星に被同会：名誉・発覚の気を受けます。評価が高まる一方、隠し事は表面化しやすいときです。"
+};
+/* ===== 三盤（年盤・月盤・日盤）総合判定の優先ルール =====
+   ルール（安全側優先で明文化）:
+   1) 七大凶殺はどの盤にあっても、その盤が司る行動には使わない。
+      ・年盤の凶 → 引っ越し・移転・長期滞在は不可（月盤・日盤が吉でも不可）
+      ・月盤の凶 → 引っ越し・旅行は不可（日常の外出は日盤優先で可）
+      ・日盤の凶 → その日の外出・買い物など日常行動は避ける。
+        引っ越し等の大事は「日を選び直す」（年・月が吉なら別の日でOK）
+   2) 吉の重み：年盤＞月盤＞日盤。三盤すべて吉＝最大吉（祐気取りの好機）。
+   3) 用途別：引越＝年盤＋月盤（＋日盤で日選び）／旅行＝月盤＋日盤／日常＝日盤。 */
+function sanbanJudge(yeD,meD,deD){
+  const yOK=yeD.kichi,mOK=meD.kichi,dOK=deD.kichi;
+  const move=yOK&&mOK;            // 引っ越し可（日盤凶ならその日を避けて日選び）
+  const trip=mOK&&dOK;            // 旅行・お出かけ可
+  const daily=dOK;                // 日常行動可
+  let rank,cls;
+  if(yOK&&mOK&&dOK){rank="◎ 三盤吉（最大吉・祐気取りの好機）";cls="best";}
+  else if(move&&!dOK){rank="○ 引越・移転は可（この日は避け、日盤吉の日を選ぶ）";cls="good";}
+  else if(trip){rank="○ 旅行・お出かけに可";cls="good";}
+  else if(daily){rank="△ 日常の外出のみ可（遠出・大事は不向き）";cls="soso";}
+  else{rank="× 避ける方位";cls="bad";}
+  return {move,trip,daily,rank,cls};
+}
+/* ============================================================
+   ADVICE_TEMPLATES（アドバイステンプレート集）
+   出典：田口二州『いちばんよくわかる九星方位気学』（学研）Part3・5・7
+   構造：3層アドバイス g=【現状認識】 a=【行動指針】 r=【期待される結果】
+   カテゴリ：total=総合運 work=仕事運 money=金運 love=対人運・恋愛運 health=健康運
+   ※文言はこのブロックを編集すれば自由に変更できます。
+   ※年運＝年盤、月運＝月盤、日運＝日盤の回座に同じ文言を時間スケール語で使い分け。
+   ============================================================ */
+const KAIZA_UNSEI={
+"坎宮":{mood:"運気の底・充電期（冬）",rank:-5,
+ total:{g:"季節にたとえると冬。厳しい寒さに耐えて春を待つ、いわゆる厄年にあたる時期です。運気が冷え込み、予期せぬアクシデントや多事多難に見舞われがちです。",a:"一気に形勢の挽回を図るのは無理と考え、大きな夢や勝負は避けて、小さな成果をひとつずつ積み重ねるように努力しましょう。",r:"焦らず足元を固めることで痛手を防ぎ、来たる上昇運に乗るための基盤が整います。"},
+ work:{g:"悩みや苦労が多く、仕事は全般的に不調です。",a:"救いは交際面。パーティーや集会、サークル活動など人の集まる場所に積極的に出かけ、いろいろな人と交流を結びましょう。",r:"交際の広がりが今後の仕事に役立ち、あなた自身の成長にもつながります。"},
+ money:{g:"思うような収入が得られないのに支出が増え、金銭的には苦しい時期。蓄えを吐き出して窮地を乗り切ることになりがちです。",a:"生活面を見直してムダを省き、上手なやり繰りを心がけてください。",r:"堅実な家計管理で乗り切れば、傷を最小限に抑えられます。"},
+ love:{g:"運勢が停滞するなか、恋愛運は盛り上がりをみせます。これまでツキに見放されていた人にもチャンスの時期です。",a:"人の集まる場所へ積極的に出かけ、知人や友人の紹介は素直に受けましょう。デートは海辺や湖畔など水にまつわる場所が吉。",r:"二人の関係はスムーズに進展するでしょう。"},
+ health:{g:"運気の衰えるこの時期、とくに注意が必要なのが健康面。大ケガや大手術の暗示もある運びです。",a:"少しでも異変を感じたら早めに受診を。健康に自信がある人でも無理をせず、疲労やストレスをためず、定期健診も怠らないこと。",r:"早期発見・早期治療を心がければ、こじらせて慢性化するのを防げます。"}},
+"坤宮":{mood:"回復・準備期（盛運一歩手前）",rank:1,
+ total:{g:"前の不調の影響が前半は残りますが、物事がスムーズに動き出す時期。後半に入ると思いがけない後援者が現れるなど明るい兆しが見えてきます。",a:"盛運を迎える一歩手前ですから、急いだり欲張ったりせず控えめに。発展のための準備期間と位置づけ、視野を広げてさまざまなものを吸収し、実力を養いましょう。",r:"翌期からの発展の土台ができ、マイホームなど懸案にもメドがつきやすくなります。"},
+ work:{g:"これまで実力を認められず気力を失いがちでしたが、ようやく真価を発揮するチャンスに恵まれ、闘志がわいてくる時期です。",a:"新規の仕事のスタートや研究成果の発表にはグッドタイミング。ただし計画は独断で進めず、周囲との協調・協力を求める姿勢を忘れずに。",r:"明るいムードのなかで評価が回復し、次の飛躍への足がかりがつかめます。"},
+ money:{g:"一気に大きな収穫は望めませんが、仕事運の好調にともなって収入面は少しずつ上向きになります。",a:"あまり欲を出さず、確実に手にできる小さな収穫をコツコツ積み上げましょう。困ったときは先輩や友人に相談を。",r:"堅実さが実を結び、良いヒントも得られて安定した収支に近づきます。"},
+ love:{g:"恋愛面は好調で、すばらしい出会いが期待できる時期です。",a:"友人の紹介や趣味・サークルを通じて、積極的に行動してください。",r:"恋愛が結婚につながりやすいのがこの時期の特長。交際中の人はゴールに向けた進展が見られます。"},
+ health:{g:"とくに胃腸に注意が必要な時期。暴飲暴食や不規則な生活に陥りやすく、慢性的な胃腸疾患をわずらうおそれがあります。",a:"規則的な生活を心がけ、病気は中途半端にせず確実に完治させること。肩や腕のケガ・変調にも気をつけて。",r:"生活リズムを守れば、太りやすい傾向や持病の悪化を防げます。"}},
+"震宮":{mood:"飛躍・発展期（9年に1度の勝負どき）",rank:2,
+ total:{g:"生き生きとした活力が身体にみなぎる、9年に1度めぐってくる飛躍の時期。運気は上昇に向かっています。",a:"胸に秘めて実現できなかったプランをどんどん実行に移しましょう。途中で立場が悪くなることがあっても、粘り強く押していくこと。いつもと違う分野にも目を向け、勇気を持って未知の世界と接触を。",r:"最終的には勝利を手にでき、ハイクラスの人たちとの交際も広がります。"},
+ work:{g:"良い環境に恵まれ、良い仕事ができる時期。過去に中途半端に終わった仕事に再挑戦する好機でもあります。",a:"性急になって周囲から浮かないよう対人関係に気を配り、独走や早合点は禁物。妙なプライドや反発心は捨て、上司や友人の好意を素直に受けて協調しましょう。",r:"物事が有利に運び、運気はさらに上がります。"},
+ money:{g:"金銭運はまずまず。収入は上がりますが、行動のわりに思うほど稼げず、投資もかさんで手元にはあまり残りません。",a:"仕事の好調に気をよくして調子に乗るのは危険。散財を避け、堅実さを忘れずに。",r:"資金繰りの忙しさを乗り切れば、上昇運を実りにつなげられます。"},
+ love:{g:"対人関係が活発化し、恋愛面も好調。良い相手とめぐり会う可能性が十分にある時期です。",a:"落ち着いて相手を見きわめ、良い関係を築いて。過去の恋愛の古傷が蒸し返されたり秘密が露見しやすいときなので、思いやりと誠実さを忘れずに。",r:"誠実に向き合えば大事には至らず、良縁が育ちます。"},
+ health:{g:"活動的になる反面、落ち着きに欠けて手足のケガが心配な時期です。",a:"寝る間も惜しんで動きがちなので、オーバーワークにならないよう休息と睡眠をきちんと。飲み過ぎによる肝臓病、咽頭の疾患、神経痛にも注意。",r:"体調管理を怠らなければ、勢いのある運気を存分に活かせます。"}},
+"巽宮":{mood:"幸運期（信用・縁が実る）",rank:3,
+ total:{g:"人がうらやむほどの幸運期。社会的な信用や人気が高まり、本業・副業とも忙しさに追われるうれしい悲鳴の時期です。",a:"あらゆるものに意欲を燃やし、たくさんのチャンスに積極的にチャレンジを。活気に満ちたこのときを逃さず、目標に向けて前進を続けましょう。ただし多忙のなかでも家庭をおろそかにしない配慮を。",r:"努力がまとまりやすく、縁談・遠方との取引など良い話が次々と実を結びます。"},
+ work:{g:"以前から取り組んでいた仕事が完成するなど良い成果が得られ、評価と信頼が高まる時期です。",a:"交友関係が広がるとき。遠方の仕事や依頼も面倒がらずに出向くことで、発展の足がかりをつかみましょう。",r:"思いがけない協力者や良い条件の仕事に恵まれ、飛び込んでくるチャンスを確実にものにできます。"},
+ money:{g:"すべてが好結果に結びつく時期だけに、実績に応じた収入を手にできます。これまでの努力の結果が大きな形となって現れます。",a:"一方で支出の増加も予測されます。ムダな出費は省きつつ、必要経費や自分に有効な投資は惜しまないこと。",r:"メリハリのあるお金の使い方が、さらなる収入増につながります。"},
+ love:{g:"交際範囲が広がり、多くの人と知り合うチャンスがある時期。一生の付き合いとなる出会いにも期待できます。",a:"良い縁談や紹介は逃さないよう、積極的に行動しましょう。",r:"交際中のカップルは結婚に向けて機運が高まり、幸せをつかみやすいときです。"},
+ health:{g:"健康面でも好調が続きます。不調が出るとしても風邪をひく程度でしょう。",a:"ただし忙しさから生活が不規則になり体力も消耗しがち。好調期でも無理を重ねないよう、健康への配慮を怠らないで。",r:"いまの節制が、来期以降に疲れや病気の芽を持ち越さない秘訣になります。"}},
+"中宮":{mood:"頂点・総決算期（実りと帰結）",rank:4,
+ total:{g:"運気の波が最高潮に達し、これまで数年間の努力の総決算が出てくる時期。周囲の注目を浴び、名誉を受ける人もいます。",a:"すべての力を余すところなく発揮し、積極的に行動を。一方で過去の問題が再燃することもあるので、思い当たる人は早急に生活設計を見直してください。",r:"目上の人や友人から頼もしい援助を得られます。翌期からは衰運期に入るため、その直前のチャンスを存分に生かせます。"},
+ work:{g:"過去の実績が集大成の形になって現れ、大きな成果を得られる時期です。",a:"前進一辺倒ではなく、積み上げた実績を維持する努力も必要。好調さから自信過剰になりやすいときほど、謙虚さを忘れずに内面の充実と安定に力を注いで。",r:"実績が確かな評価として定着し、次の九年への財産になります。"},
+ money:{g:"収入は大きく増えますが、それなりの出費もかさむ時期。気が大きくなって無謀な拡張や投資に手を出したくなります。",a:"予見できるリスクはできる限り回避を。ぜいたく思考に走らず、ムダを省いて貯蓄に回すなど将来を見すえた金銭管理を。",r:"堅実な管理で、増えた収入を確かな財産として残せます。"},
+ love:{g:"紆余曲折あって波乱含みの異性関係となりそうな時期。周囲の反対、三角関係、突然の別れ話などに見舞われることも。",a:"あまり深刻にならず、気楽な気持ちでお付き合いするのがベスト。のめり込みすぎないように。",r:"適度な距離感を保てば、自分が苦しくならずに関係を続けられます。"},
+ health:{g:"古傷が痛んだり、完治していない病気が再発したりする危険がある時期です。",a:"過去に大病を経験した人や持病のある人は再発防止と健康管理を徹底。とくに胃腸など内臓に注意し、不調を感じたら早めに受診を。",r:"疲れやストレスをためない工夫で、体調の崩れを未然に防げます。"}},
+"乾宮":{mood:"下降の入り口・引き締め期",rank:-1,
+ total:{g:"好調の余韻で積極的に動きたいところですが、運勢は下降線をたどりはじめています。浮かれた気分を捨て、気持ちを引き締める時期です。",a:"むやみな発展・拡張ではなく内部の充実に目を向けて。生活リズムの改善や資格取得など地道な努力を。交際範囲を広げるより、従来の関係を充実させましょう。",r:"好調期に築いたものを足がかりに地盤が固まり、下降期の損失を最小限にできます。"},
+ work:{g:"やる気に満ち、さらなる発展を望む気持ちが高まりますが、大きなことをはじめるのは危険な時期です。",a:"新規の事業や計画は時期の前半に、それも控えめにして信頼できる人と協力しながら。自分の実力をよくわきまえて。",r:"無理をしなければ無難に進行し、勇み足の失敗を避けられます。"},
+ money:{g:"それなりの収入は期待できますが、ぜいたく気分が抜けず浪費をくり返しがちで、手元に残るお金は少なくなります。",a:"衝動買いは極力控え、しっかりした経済観念で少しのムダも排除する心構えを。リスクの高い投機には手を出さないこと。",r:"引き締めた分だけ、下降運の中でも家計の安定を保てます。"},
+ love:{g:"高望みの傾向が出る時期。良い出会いがあっても、身の丈にそぐわない相手にばかり目が向きがちです。",a:"目の前の縁を大切に。これまで愛情を育ててきたカップルは、いっそう理解を深める好機です。",r:"堅実な相手選びなら、周囲からの援助や祝福にも恵まれ関係が進展します。"},
+ health:{g:"頭部や手足、骨全般をわずらうおそれのある時期。心身の疲労もピークに達しています。",a:"交通事故に遭う危険も高まっているので、車の運転は安全第一に。睡眠時間をしっかり確保し、リラックスできる時間を持ちましょう。",r:"休養を優先することで、事故や大きな故障を防げます。"}},
+"兌宮":{mood:"気のゆるみ・楽しみの時期",rank:-2,
+ total:{g:"気持ちにゆるみが生じ、仕事や勉強への熱意が薄れてペースが狂いやすい時期。ライバルの出現や自信喪失など、不安の募る出来事も相次ぎます。",a:"落ち着いて行動することが大切。欲は出さず、実績をキープすることに目標を絞り込みましょう。",r:"成果は「七分の出来」で満足するのが無難。それで立場と信用を守れます。"},
+ work:{g:"好調だった頃の気持ちのままでいると足元をすくわれる時期。気がゆるみ、緊張感を持続しにくい状態です。",a:"薄れがちな意欲をかき立て、ミスのないよう集中力を発揮して。取引先や職場の人間関係、とくに上司とのトラブルには注意を。",r:"引き締め直せば深刻な失敗を避け、信用を保てます。"},
+ money:{g:"予定外の出費が重なり、貯金が大幅に減っていく時期。収入の伸びは望めず、家庭内のことやレジャー費などでお金が出ていきます。",a:"どこかで歯止めをかけること。支出に優先順位をつけ、湯水のような出費を断ちましょう。",r:"早めの引き締めで、困った事態になる前に立て直せます。"},
+ love:{g:"仕事よりも遊びに目が向く時期で、恋の季節。周囲に祝福されてゴールインする人もいます。",a:"ただし浮かれすぎは禁物。悪い相手に引っかかったり、周囲に誤解を与えたりしないよう注意を。",r:"節度を保てば、恋愛を存分に楽しみながら良い縁を結べます。"},
+ health:{g:"心身ともにパワー不足を感じる時期。疲れていても遊びとなると張り切って、無理をしてしまいがちです。",a:"休日の疲れを翌日に持ち込まない配慮を。外食が増えるので栄養バランスに気をつかい、適度な運動と十分な休養で免疫力を養って。",r:"呼吸器系の疾患や自律神経の乱れを防ぎ、病気の長引きを避けられます。"}},
+"艮宮":{mood:"変化・停滞期（守りと整理のとき）",rank:-3,
+ total:{g:"すべてが思ったとおりに進まず、焦りを覚える時期。変動を求める気分が高まりますが、ここで軽挙妄動すると長く身動きできなくなります。",a:"積極策を避け、従来の方針を堅く守って内面の充実に力を注ぎましょう。腐れ縁を切るには絶好のチャンス。プラスにならない関係は整理を。",r:"やがてくる好調期にそなえて身辺がすっきりし、転換の基礎ができます。"},
+ work:{g:"職場環境の変化やポストの移動など、周囲の事情に揺さぶられる時期です。",a:"安易な打開策や新たな投資はかえって不利に。方針を変えずじっくり腰をすえ、粘り強く長期戦で。問題はその日のうち・その月のうちに解決し、繰り越さない努力を。",r:"良いプランは温めてじっと好機を待つことで、確実に活かせるときが来ます。"},
+ money:{g:"やや不安定な運気で、思うような収入は得られません。不調なときほど儲け話に敏感になりがちです。",a:"欲を出すと落とし穴にはまります。お金の貸し借りや保証関係の契約にも慎重に。収入を増やすより支出を減らす努力を。",r:"収支のバランスをうまくコントロールすれば、この時期を無事に乗り切れます。"},
+ love:{g:"独身者は幸福な結婚生活を手に入れられる時期。真剣に交際を続けてきたカップルはゴールインしそうです。",a:"縁談は先延ばしするほど支障が出るので、なるべく早めにまとめること。",r:"予期せぬ出会いや良い縁談にも恵まれます。長い交際中の人は心変わりによる別れ話に注意を。"},
+ health:{g:"骨折・捻挫・関節痛・腰痛・リウマチなど、骨や筋肉・関節の故障に注意が必要な時期です。",a:"環境の変化による心労で体調を崩すおそれも。精神的に不安定になりやすいので、心因性の病気に十分気をつけて。",r:"心身をいたわることで、変化の時期を健康に乗り越えられます。"}},
+"離宮":{mood:"明暗が分かれる時期（発覚と評価）",rank:-4,
+ total:{g:"表面的には活気に満ち周囲の注目を浴びますが、内面は苦しい時期。忙しく動き回るわりに収穫に恵まれません。隠れていたことが明るみに出るときです。",a:"下手な野心は捨て、いま取り組んでいることに全力を傾けましょう。",r:"積み重ねた努力は評価されて地位や名声につながります。逆にごまかしは発覚するので、誠実さが明暗を分けます。"},
+ work:{g:"頭が冴えて感性が豊かになり、独自の発想や工夫が周囲の共感を呼ぶ時期です。",a:"地道に研究を重ねてきたことを表に出しましょう。一方、手を抜いてきたことはミスや非難として表面化するので、足元の点検を。",r:"良いアイデアが採用され重要なポジションに就いたり、学問・芸術の分野で評価される実績を残せたりします。"},
+ money:{g:"生活が派手になる傾向の時期。周囲からは好調に見えても、実際はお金が出ていくばかりで懐具合は苦しい状態です。",a:"見栄を張ったり体裁にこだわったりせず、倹約を心がけてムダを省きましょう。",r:"家計が火の車になるのを防ぎ、収支の崩れを立て直せます。"},
+ love:{g:"知り合うチャンスに恵まれ華麗な恋愛運ですが、熱しやすく冷めやすく、火遊び的なムードが漂う時期です。",a:"家庭がある人や恋人がいる人は、感情のおもむくままの行動を慎んで。",r:"節度を守れば華やかな出会いを楽しめ、大切な関係の亀裂や破局を避けられます。"},
+ health:{g:"眼や頭の病気など、首から上の疾患が心配な時期。心臓や血圧、心の病にも注意が必要です。",a:"不調を感じたら放置せず早めに受診を。眼精疲労からくる頭痛にも気をつけ、ストレスをため込まず精神面の安定を図りましょう。",r:"早めの手当てで悪化を防ぎ、冴えた頭脳を存分に活かせます。"}}};
+/* 方徳・方災（各九星の方位がもたらす幸運と不運）出典：同書Part5 */
+const HOUTOKU={
+ 1:{toku:"新規の仕事や事業がはじまる・取引が小から大へ発展・良い部下や交友に恵まれる・悪縁が消滅する・心身が若返り健康運が上向く・子宝や良縁に恵まれる",sai:"新しい仕事での失敗・悪い交友や経済的行き詰まり・異性関係のトラブル・水難や盗難"},
+ 2:{toku:"勤労意欲が増す・営業先が開拓される・土地や不動産に関する利益・年配女性の援助・胃腸の調子が良くなる・古いものによる開運",sai:"仕事で怠け癖がつく・目上からの援助が打ち切られる・不動産を失う・内臓の病気"},
+ 3:{toku:"運勢がどんどん発展する・斬新なアイデアで成功・ファイトがわき人気が高まる・話術が上達する・若い人が力を貸してくれる・健康になる",sai:"発展が止まる・舌禍やしゃべりすぎで人に嫌われる・口車に乗って損をする・神経痛や肝臓の不調・火難"},
+ 4:{toku:"すべてが整い世間の信用が増す・遠方から良い取引が舞い込む・交際が広がり人気が出る・人柄が円満になる・良縁が舞い込む",sai:"信用を失い行き詰まる・遠方との取引で損失・縁談が遠のく・風邪をこじらせ肺を痛める・家庭不和"},
+ 5:{toku:"（五黄は後天定位盤で中央に位置するため方徳はありません）",sai:"積極性と気力を失う・信用とお金を失い生活が困窮する・食中毒や慢性の下痢・古い病気の再発・大やけど"},
+ 6:{toku:"目上の引き立てがある・発明発見や新事業がスムーズに始まる・独立心と実行力が身につく・勝負運が強まる・リーダーシップを発揮できる",sai:"新事業の失敗・目上の引き立てを失う・自信過剰で争いを好む・投機やギャンブルで損失・大ケガや交通事故"},
+ 7:{toku:"良い人脈ができる・会食からチャンスをつかむ・話術が巧みになりひとことが開運につながる・現金に関する喜び・恋愛や結婚のチャンス・食に不自由しない",sai:"言葉で大きな失敗・経済的に苦しむ・異性関係の失敗・口の中や肺の病気・刃物の災難"},
+ 8:{toku:"良い意味の変化が起こる・相続や後継ぎに恵まれる・人の世話が利益になって返る・不動産で利益・貯蓄心が起き財産が増える・行き詰まりが打破される・家庭円満",sai:"家運が衰える・新旧交代や親類縁故からの損害・財産を失う・関節や脊髄を痛める・転職を重ね協調性を失う"},
+ 9:{toku:"地位や名誉を得る・公的な仕事で成功・知識が広がり目先がきく・良いアイデアと決断力・美的感覚にすぐれる・心臓や血行が良くなる",sai:"地位と名誉を失う・洞察力が鈍り悪い交友が生じる・文書や印鑑のトラブル・目や脳の病気・別離"}};
+/* 凶殺の現象（出典：同書Part3。書籍では暗剣殺＝悪殺気、本命殺・月命殺＝精気殺、的殺＝対気殺と表記） */
+const KYOSATSU_INFO={
+ "五黄殺":"すべてを腐敗・消滅させる最も強烈な凶方位。精神面に邪気を帯び、突発的な事故や災害、命にかかわる病気の心配があります。引っ越しはもちろん日々の行動でも避けたい方位です。",
+ "暗剣殺":"五黄土星の反対側に生じる凶方位（悪殺気）。他者からの災いに巻き込まれやすく、突然の事故や対人トラブル、悪意ある人に陥れられるなどの凶作用があります。",
+ "歳破":"その年の十二支の反対側の方位。争いごとに巻き込まれやすく、業績不振や仕事上の大損のおそれがあります。",
+ "月破":"その月の十二支の反対側の方位。歳破と同様、争いごとや仕事上の損失に注意が必要です（その月のみの凶）。",
+ "日破":"その日の十二支の反対側の方位。その日の行動（外出・買い物・契約など）で争いや損失を招きやすい方位です。",
+ "本命殺":"自分の本命星が回座している方位（精気殺）。使うと健康運がダウンし、原因不明の病気にかかりやすくなります。自分自身を痛める作用があります。",
+ "本命的殺":"本命星の反対側の方位（対気殺）。本命殺と対をなし、心身や運気を損ないやすい凶方位です。",
+ "月命殺":"自分の月命星が回座している方位（生月精気殺）。本命殺と同様、健康面を損ないやすい凶方位です。",
+ "月命的殺":"月命星の反対側の方位。月命殺と対をなす凶方位です。"};
+/* 3層アドバイス生成（現状認識→行動指針→期待される結果） */
+const SCALE_WORD={year:{now:"今年",unit:"年",ban:"年盤"},month:{now:"今月",unit:"月",ban:"月盤"},day:{now:"今日",unit:"日",ban:"日盤"}};
+function genAdvice(H,c,scale){
+  const sw=SCALE_WORD[scale];const kyu=doukaiKyuOf(H,c);const K=KAIZA_UNSEI[kyu];
+  const hd=hidoukaiStar(H,c);
+  const catName={total:"総合運",work:"仕事運",money:"金運",love:"対人運・恋愛運",health:"健康運"};
+  const cats=Object.keys(catName).map(k=>({key:k,name:catName[k],g:K[k].g,a:K[k].a,r:K[k].r}));
+  const intro=sw.now+"は本命星（"+STAR[H]+"）が"+sw.ban+"で「"+kyu+"」に回座しています（"+K.mood+"）。";
+  return {kyu:kyu,mood:K.mood,rank:K.rank,intro:intro,cats:cats,hidoukai:HIDOUKAI_INFO[hd],hidouStar:hd};
+}
+/* 吉方位の活用アドバイス（祐気取り）：その方位に回座する九星の方徳を提示 */
+function kichiAdvice(ev){
+  return ev.filter(x=>x.kichi).map(x=>({dir:x.dir,star:x.star,toku:HOUTOKU[x.star].toku}));
+}
+/* 凶方位の警告：方位ごとの凶殺名と現象＋回座星の方災
+   scale指定で「破」を歳破/月破/日破に読み替える */
+function kyoAdvice(ev,scale){
+  const haName={year:"歳破",month:"月破",day:"日破"}[scale]||"破";
+  return ev.filter(x=>x.kyo.length).map(x=>{
+    const names=x.kyo.map(k=>k==="破"?haName:k);
+    return {dir:x.dir,star:x.star,names:names,info:names.map(k=>KYOSATSU_INFO[k]||"").join(" "),sai:HOUTOKU[x.star].sai};});
+}
+/* ===== 今日の運勢（日盤ベース）タスク3 ===== */
+/* 指定日の三盤データ一式を計算 */
+function sanbanData(H,M,y,m,d){
+  const tmb=monthBranchAndYear(y,m,d);const sy=tmb.solarYear;
+  const yc=honmei(sy);const ye=houiEval(H,M,yc,yearIdx(sy)%12);
+  const mcc=monthChartCentral(sy,tmb.branch);const me=houiEval(H,M,mcc,BRANCHES.indexOf(tmb.branch));
+  const dcs=dayCentralStar(y,m,d);const db=dayIdx(y,m,d)%12;const de=houiEval(H,M,dcs.c,db);
+  return {sy:sy,tmb:tmb,yc:yc,ye:ye,mcc:mcc,me:me,dcs:dcs,db:db,de:de};
+}
+function _getSelf(){
+  const y=+v("y"),m=+v("m"),d=+v("d");if(!y||!m||!d){alert("あなたの生年月日（一番上の欄）を入力してください");return null;}
+  let hh=v("hh"),mm=v("mm");hh=hh===""?null:+hh;mm=mm===""?0:+mm;
+  const male=document.querySelector("#sex .on").dataset.v==="1";
+  return compute(y,m,d,hh,mm,male);
+}
+function todayFortune(){
+  const P=_getSelf();if(!P)return;
+  const H=P.honmei,M=P.getsumei;
+  const fy=+v("fy"),fm=+v("fm"),fd=+v("fd");
+  if(!fy||!fm||!fd){alert("調べる日付を入力してください");return;}
+  const S=sanbanData(H,M,fy,fm,fd);
+  const adv=genAdvice(H,S.dcs.c,"day");
+  const kichi=kichiAdvice(S.de);const kyo=kyoAdvice(S.de,"day");
+  // 三盤すべて吉の方位（祐気取り向き）
+  const best=DIRS.filter((dn,i)=>sanbanJudge(S.ye[i],S.me[i],S.de[i]).cls==="best");
+  const total=adv.cats.find(c=>c.key==="total");
+  let h='<div class="card"><h2>'+fy+'年'+fm+'月'+fd+'日の運勢（本命星 '+STAR[H]+'）'+srcBadge("KAIZA_UNSEI")+'</h2>'
+    +'<p class="muted">日盤中宮：<b>'+STAR[S.dcs.c]+'</b>（'+S.dcs.mode+'遁）／日干支：'+kanshi(dayIdx(fy,fm,fd))+'／あなたの本命星は日盤で<b>'+adv.kyu+'</b>に回座（'+adv.mood+'）</p>'
+    +'<div style="background:#fbf8f3;border-radius:10px;padding:10px 12px;margin:8px 0">'
+    +'<p style="margin:0"><b>【現状認識】</b>'+total.g+'</p>'
+    +'<p style="margin:6px 0 0"><b>【行動指針】</b>'+total.a+'</p>'
+    +'<p style="margin:6px 0 0"><b>【期待される結果】</b>'+total.r+'</p></div>'
+    +'<div style="font-size:.88rem">'+adv.cats.filter(c=>c.key!=="total").map(c=>'<p style="margin:5px 0"><b>'+c.name+'：</b>'+c.g+' '+c.a+'</p>').join("")+'</div>'
+    +'<div class="warn-box" style="margin-top:10px;background:#eef6f0;border-left-color:#3a7c5a"><b>今日の吉方位（日盤）：</b>'
+    +(kichi.length?kichi.map(x=>'<br><b>'+x.dir+'</b>（'+STAR[x.star]+'）：'+x.toku).join(""):"この日は日盤の吉方位がありません")+'</div>'
+    +(best.length?'<p style="font-size:.86rem;margin:8px 0"><b>◎ 三盤（年・月・日）すべて吉：'+best.join("・")+'</b>　…この方位へのお出かけ・買い物は特におすすめです（祐気取り向き）。</p>':'')
+    +'<div class="warn-box" style="margin-top:8px"><b>今日の凶方位（日盤）：</b>'
+    +(kyo.length?kyo.map(x=>'<br><b>'+x.dir+'</b>＝'+x.names.join("・")+'：'+x.info).join(""):"七大凶殺に当たる方位はありません")+'</div>'
+    +'<p class="hint">日盤は陽遁・陰遁（冬至/夏至に最も近い甲子の日を境に切替・置閏なしの標準法）で算出。お出かけ・買い物などの日常行動は日盤を、旅行は月盤＋日盤を、引っ越しは年盤＋月盤を優先して判断します。</p></div>';
+  document.getElementById("today").innerHTML=h;
+  document.getElementById("today").scrollIntoView({behavior:"smooth"});
+}
+/* 指定日から30日間で「吉方位への移動に適した日」を検索（三盤すべて吉の方位がある日） */
+function searchGoodDays(){
+  const P=_getSelf();if(!P)return;
+  const H=P.honmei,M=P.getsumei;
+  const fy=+v("fy"),fm=+v("fm"),fd=+v("fd");
+  if(!fy||!fm||!fd){alert("起点となる日付を入力してください");return;}
+  let rows="";let cnt=0;
+  for(let off=0;off<30;off++){
+    const dt=new Date(fy,fm-1,fd);dt.setDate(dt.getDate()+off);
+    const yy=dt.getFullYear(),mo=dt.getMonth()+1,dd=dt.getDate();
+    const S=sanbanData(H,M,yy,mo,dd);
+    const best=DIRS.filter((dn,i)=>sanbanJudge(S.ye[i],S.me[i],S.de[i]).cls==="best");
+    if(best.length){cnt++;
+      const wd=["日","月","火","水","木","金","土"][dt.getDay()];
+      rows+='<tr><td>'+yy+'/'+mo+'/'+dd+'（'+wd+'）</td><td>'+STAR[S.dcs.c]+'（'+S.dcs.mode+'遁）</td><td style="text-align:left"><b>'+best.join("・")+'</b></td></tr>';}
+  }
+  let h='<div class="card"><h2>吉方位に良い日（'+fy+'/'+fm+'/'+fd+' から30日間・本命星 '+STAR[H]+'）</h2>'
+    +'<p class="muted">年盤・月盤・日盤の三盤すべてで吉となる方位がある日の一覧です。この方位への移動・お出かけは祐気取りに最適です。</p>'
+    +(cnt?'<table><tr><th>日付</th><th>日盤中宮</th><th>三盤とも吉の方位</th></tr>'+rows+'</table>'
+        :'<p>この30日間には、三盤すべてで吉となる方位のある日が見つかりませんでした。起点日を変えてお試しください。</p>')
+    +'<p class="hint">引っ越しなど大きな移動は、さらに「調べる年」の年盤・月盤判定（引っ越し・旅行の方位相談）とあわせてご確認ください。</p></div>';
+  document.getElementById("today").innerHTML=h;
+  document.getElementById("today").scrollIntoView({behavior:"smooth"});
+}
+/* 「今日の運勢」日付欄を今日で初期化 */
+function initTodayInputs(){
+  const t=new Date();
+  const set=(id,val)=>{const e=document.getElementById(id);if(e&&!e.value)e.value=val;};
+  set("fy",t.getFullYear());set("fm",t.getMonth()+1);set("fd",t.getDate());
+}
 function monthChartCentral(sy,branch){const yb=yearIdx(sy)%12;
   let base=([0,6,3,9].indexOf(yb)>=0)?8:([4,10,1,7].indexOf(yb)>=0)?5:2;
   const order=["寅","卯","辰","巳","午","未","申","酉","戌","亥","子","丑"];const i=order.indexOf(branch);
@@ -409,7 +653,9 @@ function dayCentralStar(y,m,d){const D=new Date(y,m-1,d);
   const wPrev=nearestKoushiDate(y-1,12,termDay(y-1,"冬至")),summer=nearestKoushiDate(y,6,termDay(y,"夏至")),winter=nearestKoushiDate(y,12,termDay(y,"冬至"));
   let a,mode;if(D>=winter){a=winter;mode=1;}else if(D>=summer){a=summer;mode=0;}else if(D>=wPrev){a=wPrev;mode=1;}else{a=nearestKoushiDate(y-1,6,termDay(y-1,"夏至"));mode=0;}
   const dc=Math.round((D-a)/86400000);return {c:mode?((dc%9)+1):(9-(dc%9)),mode:mode?"陽":"陰"};}
-function houiEval(H,M,c,yb){const stars=chartStars(c);const go=stars.indexOf(5),an=(go+4)%8,hp=stars.indexOf(H),tp=(hp+4)%8,gp=stars.indexOf(M),gtp=(gp+4)%8,ha=(BRANCH_DIR[yb]+4)%8;
+function houiEval(H,M,c,yb){const stars=chartStars(c);
+  /* 中宮に入った星は八方位に存在しない（indexOf=-1）。その場合は殺も的殺も生じない（五黄中宮の盤に五黄殺・暗剣殺がないのと同じ理屈） */
+  const go=stars.indexOf(5),an=go<0?-1:(go+4)%8,hp=stars.indexOf(H),tp=hp<0?-1:(hp+4)%8,gp=stars.indexOf(M),gtp=gp<0?-1:(gp+4)%8,ha=(BRANCH_DIR[yb]+4)%8;
   let out=[];for(let d=0;d<8;d++){let kyo=[];if(d===go)kyo.push("五黄殺");if(d===an)kyo.push("暗剣殺");if(d===hp)kyo.push("本命殺");if(d===tp)kyo.push("本命的殺");if(d===gp)kyo.push("月命殺");if(d===gtp)kyo.push("月命的殺");if(d===ha)kyo.push("破");
     const se=STAR_ELEM[stars[d]],he=STAR_ELEM[H];let rel;if(se===he)rel="比和";else if((se+1)%5===he)rel="生気";else if((he+1)%5===se)rel="退気";else if((se+2)%5===he)rel="殺気";else rel="死気";
     let k=false,label;if(kyo.length)label="凶（"+kyo.join("・")+"）";else if(rel==="殺気"||rel==="死気")label="凶（"+rel+"）";else{k=true;label="吉（"+rel+"）";}
@@ -706,6 +952,92 @@ function rikushinCard(r,male){
     +'<p class="hint">理想型は日干だけで家族の干を定める型（宿命内に在るかは問わない）。現実型は宿命の陰占内に実在する干から、第一優先＝理想型、第二優先＝偏母・恋人など、最終＝定位置（母＝月支の本元／父・子供＝月干／配偶者＝日支の本元）の順で採用します。兄弟姉妹は定位置を持たず、無ければ「縁が薄い」と判断します。自分と同じ干が前後の代に現れると、その人物と縁が深いことを意味します。</p></div>';
   return html;}
 
+/* ===== タスク4：九星気学アドバイスUI（方位盤SVG・年/月/日タブ） ===== */
+/* 8方位の方位盤SVG（南が上・九星気学式。既存dirGridと同じ向き：東=左・西=右） */
+const DIR_ANGLE={"南":0,"南西":45,"西":90,"北西":135,"北":180,"北東":225,"東":270,"南東":315};
+function houiBanSVG(central,ev,label){
+  const cx=120,cy=120,r1=40,r2=108,rt=76;
+  const rad=a=>(a-90)*Math.PI/180;
+  const pt=(r,a)=>[cx+r*Math.cos(rad(a)),cy+r*Math.sin(rad(a))];
+  let paths="";
+  ev.forEach(x=>{
+    const a=DIR_ANGLE[x.dir];const a0=a-22.5,a1=a+22.5;
+    const p0=pt(r2,a0),p1=pt(r2,a1),p2=pt(r1,a1),p3=pt(r1,a0);
+    const fill=x.kyo.length?"#f6dfe1":(x.kichi?"#e4f1e8":"#f2ead9");
+    paths+='<path d="M'+p0[0].toFixed(1)+' '+p0[1].toFixed(1)+' A'+r2+' '+r2+' 0 0 1 '+p1[0].toFixed(1)+' '+p1[1].toFixed(1)+' L'+p2[0].toFixed(1)+' '+p2[1].toFixed(1)+' A'+r1+' '+r1+' 0 0 0 '+p3[0].toFixed(1)+' '+p3[1].toFixed(1)+' Z" fill="'+fill+'" stroke="#c9c0ae" stroke-width="1"/>';
+    const tp=pt(rt,a);
+    const kyoTxt=x.kyo.length?x.kyo.join("・"):(x.kichi?"吉":"凶");
+    const kyoCol=x.kyo.length?"#b0393f":(x.kichi?"#2f7a4f":"#a5763a");
+    paths+='<text x="'+tp[0].toFixed(1)+'" y="'+(tp[1]-12).toFixed(1)+'" text-anchor="middle" font-size="10.5" fill="#8a8276">'+x.dir+'</text>'
+      +'<text x="'+tp[0].toFixed(1)+'" y="'+(tp[1]+3).toFixed(1)+'" text-anchor="middle" font-size="13" font-weight="bold" fill="#5a4632">'+STAR[x.star].substring(0,2)+'</text>'
+      +'<text x="'+tp[0].toFixed(1)+'" y="'+(tp[1]+16).toFixed(1)+'" text-anchor="middle" font-size="8" fill="'+kyoCol+'">'+kyoTxt+'</text>';
+  });
+  return '<svg viewBox="0 0 240 240" style="width:235px;max-width:100%;display:block;margin:4px auto">'
+    +paths
+    +'<circle cx="120" cy="120" r="'+(r1-2)+'" fill="#efe6d2" stroke="#c9c0ae"/>'
+    +'<text x="120" y="112" text-anchor="middle" font-size="9" fill="#8a8276">'+label+'中宮</text>'
+    +'<text x="120" y="128" text-anchor="middle" font-size="13" font-weight="bold" fill="#5a4632">'+STAR[central].substring(0,2)+'</text></svg>';
+}
+/* 年運/月運/日運タブの切り替え */
+function kigakuTab(i){
+  for(let k=0;k<4;k++){
+    const p=document.getElementById("kigakupanel"+k);if(p)p.style.display=(k===i)?"block":"none";
+  }
+  document.querySelectorAll(".ktabbtn").forEach(b=>{
+    const on=+b.dataset.i===i;
+    b.style.background=on?"#6b5b95":"#f4f1fa";b.style.color=on?"#fff":"#5a4a7a";
+  });
+}
+/* 九星気学からのアドバイス カード本体 */
+function kigakuAdviceCard(H,M,ty,tm,td){
+  const S=sanbanData(H,M,ty,tm,td);
+  const banLbl=["年盤","月盤","日盤"];
+  const scales=[
+    {key:"year",c:S.yc,ev:S.ye,head:"年運（"+S.sy+"年）",note:"立春区切り・年盤中宮："+STAR[S.yc]},
+    {key:"month",c:S.mcc,ev:S.me,head:"月運（"+S.tmb.branch+"月）",note:"節入り区切り・月盤中宮："+STAR[S.mcc]},
+    {key:"day",c:S.dcs.c,ev:S.de,head:"日運（"+ty+"/"+tm+"/"+td+"）",note:"日盤中宮："+STAR[S.dcs.c]+"（"+S.dcs.mode+"遁）・日干支："+kanshi(dayIdx(ty,tm,td))}
+  ];
+  const panel=(s,idx)=>{
+    const adv=genAdvice(H,s.c,s.key);
+    const total=adv.cats.find(c=>c.key==="total");
+    const kichi=kichiAdvice(s.ev),kyo=kyoAdvice(s.ev,s.key);
+    return '<div id="kigakupanel'+idx+'" style="display:'+(idx===0?"block":"none")+'">'
+      +'<p style="margin:6px 0 2px"><b>'+s.head+'</b>　<span class="muted" style="font-size:.8rem">'+s.note+'</span></p>'
+      +'<p style="margin:4px 0">'+adv.intro+'</p>'
+      +'<div style="background:#f7f4fb;border-left:3px solid #6b5b95;border-radius:8px;padding:9px 11px;margin:6px 0">'
+      +'<p style="margin:0"><b>【現状認識】</b>'+total.g+'</p>'
+      +'<p style="margin:5px 0 0"><b>【行動指針】</b>'+total.a+'</p>'
+      +'<p style="margin:5px 0 0"><b>【期待される結果】</b>'+total.r+'</p></div>'
+      +'<div style="font-size:.86rem">'+adv.cats.filter(c=>c.key!=="total").map(c=>'<p style="margin:5px 0"><b>'+c.name+'：</b>'+c.g+' '+c.a+' <span class="muted">'+c.r+'</span></p>').join("")+'</div>'
+      +'<p style="font-size:.86rem;margin:6px 0"><b>被同会：</b>'+adv.hidoukai+srcBadge("HIDOUKAI_INFO")+'</p>'
+      +houiBanSVG(s.c,s.ev,banLbl[idx])
+      +'<div class="warn-box" style="margin-top:8px;background:#eef6f0;border-left-color:#3a7c5a"><b>吉方位と期待できる方徳'+'</b>'+srcBadge("HOUTOKU")
+      +(kichi.length?kichi.map(x=>'<br><b>'+x.dir+'</b>（'+STAR[x.star]+'）：'+x.toku).join(""):"<br>この"+banLbl[idx]+"では吉方位がありません")+'</div>'
+      +'<div class="warn-box" style="margin-top:8px"><b>凶方位の警告</b>'+srcBadge("KYOSATSU_INFO")
+      +(kyo.length?kyo.map(x=>'<br><b>'+x.dir+'</b>＝'+x.names.join("・")+'：'+x.info).join(""):"<br>七大凶殺に当たる方位はありません")+'</div>'
+      +'</div>';
+  };
+  /* 三盤総合パネル：優先ルール（sanbanJudge）による用途別判定 */
+  let rows="";
+  DIRS.forEach((dn,i)=>{
+    const j=sanbanJudge(S.ye[i],S.me[i],S.de[i]);
+    const col=j.cls==="best"?"#2f7a4f":(j.cls==="good"?"#3a7c5a":(j.cls==="soso"?"#a5763a":"#b0393f"));
+    rows+='<tr><td><b>'+dn+'</b></td>'
+      +'<td style="font-size:.78rem;color:'+(S.ye[i].kichi?"#3a7c5a":"#b06a3a")+'">'+S.ye[i].label+'</td>'
+      +'<td style="font-size:.78rem;color:'+(S.me[i].kichi?"#3a7c5a":"#b06a3a")+'">'+S.me[i].label+'</td>'
+      +'<td style="font-size:.78rem;color:'+(S.de[i].kichi?"#3a7c5a":"#b06a3a")+'">'+S.de[i].label+'</td>'
+      +'<td style="font-size:.82rem;color:'+col+'"><b>'+j.rank+'</b></td></tr>';
+  });
+  const sanban='<div id="kigakupanel3" style="display:none">'
+    +'<p style="margin:6px 0"><b>三盤（年盤・月盤・日盤）総合判定</b>　<span class="muted" style="font-size:.8rem">'+ty+'/'+tm+'/'+td+' 基準</span></p>'
+    +'<p class="muted" style="font-size:.82rem;margin:2px 0">優先ルール：凶殺はどの盤でも安全側優先（年盤凶→引越不可／月盤凶→引越・旅行不可／日盤凶→日を選び直す）。吉の重みは年＞月＞日。</p>'
+    +'<table class="kstbl"><tr><th>方位</th><th>年盤</th><th>月盤</th><th>日盤</th><th>総合判定</th></tr>'+rows+'</table></div>';
+  return '<div class="card" style="border-left:4px solid #6b5b95"><h2>九星気学からのアドバイス'+srcBadge("KAIZA_UNSEI")+'</h2>'
+    +'<p class="muted" style="font-size:.84rem">『九星方位気学』（田口二州・学研）のデータに基づく判定です。紫色の枠が目印で、従来の書物データによる判定（上のカード群）とは出典が異なります。日付は入力欄の「年運/月運/吉方の年・月・日」を使用しています。</p>'
+    +'<div style="display:flex;gap:6px;margin:8px 0">'
+    +["年運","月運","日運","三盤総合"].map((t,i)=>'<button type="button" class="ktabbtn" data-i="'+i+'" onclick="kigakuTab('+i+')" style="flex:1;padding:8px 4px;border:1px solid #b9aed0;border-radius:8px;background:'+(i===0?"#6b5b95":"#f4f1fa")+';color:'+(i===0?"#fff":"#5a4a7a")+';font-size:.9rem;cursor:pointer">'+t+'</button>').join("")+'</div>'
+    +scales.map((s,i)=>panel(s,i)).join("")+sanban+'</div>';
+}
 function run(){
   const y=+v("y"),m=+v("m"),d=+v("d");let hh=v("hh"),mm=v("mm");
   hh=hh===""?null:+hh; mm=mm===""?0:+mm;
@@ -739,7 +1071,7 @@ function run(){
     +'<p class="hint">列は'+(r.hour?'時柱・':'')+'日柱・月柱・年柱の順'+(r.hour?'（時柱は出生時刻を入れた場合のみ表示。算命学では年・月・日の3柱を基本とし、陰占五行も3柱で集計します）':'')+'。蔵干（元命）は節入りからの経過日数（定気法）で判定、余蔵干はその他の蔵干です。<span style="color:#d2342f">赤字</span>は異常干支。位相法は地支どうしの関係（支合・半会・対冲・刑・害・破）と天干の干合を表します。</p></div>';
 
   const kei=keisha(r.honmei,r.getsumei,male);
-  const yStarD=honmei(ty);const dchart=chartStars(yStarD);const _di=dchart.indexOf(r.honmei);const doukaiKyu=(r.honmei===yStarD||_di<0)?"中宮":KYU[_di];
+  const yStarD=honmei(ty);const doukaiKyu=doukaiKyuOf(r.honmei,yStarD);const hidouStar=hidoukaiStar(r.honmei,yStarD);
   const TEII_KYU={1:"坎宮",2:"坤宮",3:"震宮",4:"巽宮",5:"中宮",6:"乾宮",7:"兌宮",8:"艮宮",9:"離宮"};const honmeiTeii=TEII_KYU[r.honmei];
   let stars='<div class="card"><h2>九星気学</h2><div class="stars">'
     +'<div class="star"><div class="lbl">本命星</div><div class="big">'+STAR[r.honmei]+'</div></div>'
@@ -748,7 +1080,8 @@ function run(){
     +'<div class="star"><div class="lbl">同会（後天定位）</div><div class="big">'+honmeiTeii+'</div></div></div>'
     +'<p style="margin-top:12px"><b>本命星の性格：</b>'+STAR_INFO[r.honmei].c+'</p>'
     +'<p><b>傾斜「'+kei.kyu+'」が示す内面：</b>'+KEISHA_INFO[kei.kyu]+(kei.same?'':' この傾向が、表に見える本命星の奥にある"本当の自分"を表します。')+'</p>'
-    +'<p style="margin-top:10px"><b>同会法：本命星'+STAR[r.honmei]+'・各宮回座での運勢</b>　<span class="muted">'+ty+'年は <b>'+doukaiKyu+'同会</b>'+(DOUKAI_INFO[doukaiKyu]?'（'+DOUKAI_INFO[doukaiKyu].r+'）':'')+'</span></p>'
+    +'<p style="margin-top:10px"><b>同会法：本命星'+STAR[r.honmei]+'・各宮回座での運勢</b>'+srcBadge("DOUKAI_INFO")+'　<span class="muted">'+ty+'年は <b>'+doukaiKyu+'同会</b>'+(DOUKAI_INFO[doukaiKyu]?'（'+DOUKAI_INFO[doukaiKyu].r+'）':'')+'</span></p>'
+    +'<p style="margin:4px 0"><b>被同会（'+ty+'年）：</b>あなたの定位宮（'+honmeiTeii+'）には <b>'+STAR[hidouStar]+'</b> が回座。'+srcBadge("HIDOUKAI_INFO")+'<br><span style="font-size:.88rem">'+HIDOUKAI_INFO[hidouStar]+'</span></p>'
     +'<p class="muted" style="margin:2px 0">後天定位盤（南が上）。<span style="color:#3a7c5a">★緑＝生まれ持つ定位宮（本命星 '+STAR[r.honmei]+'）</span>、<span style="color:#9c3b44">▶桃＝'+ty+'年に回座している宮（同会）</span>。</p>'
     +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;max-width:340px;margin:6px 0">'+[["南東","巽宮",4],["南","離宮",9],["南西","坤宮",2],["東","震宮",3],["中央","中宮",5],["西","兌宮",7],["北東","艮宮",8],["北","坎宮",1],["北西","乾宮",6]].map(c=>{const hT=c[1]===honmeiTeii;const hY=c[1]===doukaiKyu;const bg=hT?"#eef6f0":hY?"#fbeff0":"#fbf8f3";return `<div style="border:1px solid #e3dccf;border-radius:8px;padding:6px 2px;text-align:center;background:${bg}"><div style="font-size:.6rem;color:#a99">${c[0]}</div><div style="font-size:.82rem;font-weight:bold;color:#7c5a3a">${c[1]}</div><div style="font-size:.68rem;color:#8a8276">定位 ${STAR[c[2]]}</div>${hT?`<div style="font-size:.66rem;color:#3a7c5a;font-weight:bold;margin-top:2px">★本命 ${STAR[r.honmei]}</div>`:""}${hY?`<div style="font-size:.66rem;color:#9c3b44;font-weight:bold;margin-top:1px">▶${ty}年回座</div>`:""}</div>`;}).join("")+'</div>'
     +'<div style="font-size:.84rem">'+["中宮","巽宮","震宮","坤宮","乾宮","兌宮","艮宮","離宮","坎宮"].map(k=>`<div style="margin-top:3px;padding:3px 6px${k===doukaiKyu?";background:#eef6f0;border-radius:6px":""}">${k===doukaiKyu?"▶ ":"　"}<b>${k}（${DOUKAI_INFO[k].r}）</b>：${DOUKAI_INFO[k].d}</div>`).join("")+'</div>'
@@ -878,11 +1211,13 @@ function run(){
 
   const suuriH=suurihouCard(r);
   const rikushinH=rikushinCard(r,male);
-  document.getElementById("result").innerHTML=mei+sanmeiH+tcsCard+suuriH+rikushinH+stars+chara+tokusei+warn+dr+flow+fr+kh;
+  const kigaku=kigakuAdviceCard(r.honmei,r.getsumei,ty,tm,td);
+  document.getElementById("result").innerHTML=mei+sanmeiH+tcsCard+suuriH+rikushinH+stars+chara+tokusei+warn+dr+flow+fr+kh+kigaku;
   document.getElementById("result").scrollIntoView({behavior:"smooth"});
 }
 document.querySelectorAll(".seg").forEach(seg=>seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
   seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");}));
+initTodayInputs();
 run();
 </script>
 </body>

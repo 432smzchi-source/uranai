@@ -146,6 +146,10 @@ section h2{font-size:.88rem;border-left:5px solid #7c5a3a;padding-left:6px;margi
           <td><span class="bp">(左手)</span><span class="kj" id="c_dz">　</span><span class="sub" id="c_dz_s">　</span></td>
           <td><span class="bp">(胸)</span><span class="kj" id="c_mz">　</span><span class="sub" id="c_mz_s">　</span></td>
           <td><span class="bp">(右手)</span><span class="kj" id="c_yz">　</span><span class="sub" id="c_yz_s">　</span></td></tr>
+        <tr><th class="rowh">余蔵干</th>
+          <td id="c_dy" style="font-size:.82rem;color:#555">　</td>
+          <td id="c_my" style="font-size:.82rem;color:#555">　</td>
+          <td id="c_yy" style="font-size:.82rem;color:#555">　</td></tr>
         <tr><th class="rowh">天中殺</th>
           <td colspan="2" class="tcs" id="c_tcs">　</td>
           <td id="c_tcs_m" style="font-size:.85rem">　月　月</td></tr>
@@ -153,7 +157,7 @@ section h2{font-size:.88rem;border-left:5px solid #7c5a3a;padding-left:6px;margi
           <td colspan="3" id="c_chusatsu" style="font-size:.82rem;text-align:left;padding-left:8px">　</td></tr>
       </tbody>
     </table>
-    <div class="note">核リズム＝十干／時空＝十二支／臓干＝蔵干（節入りからの経過日数による）。年・月は節入り切替。</div>
+    <div class="note">核リズム＝十干／時空＝十二支／臓干＝蔵干（節入りからの経過日数による本蔵干）。余蔵干＝その支の蔵干（初元干・中元干・本元干）を全て表示。年・月は節入り切替。</div>
   </section>
 
   <section style="margin:0">
@@ -238,6 +242,7 @@ function juniun(ds,branch){const start=CHANG[ds];const yang=ds%2===0;let diff=ya
 const ZOKAN={0:9,1:5,2:0,3:1,4:4,5:2,6:3,7:5,8:6,9:7,10:4,11:8};
 const ZOUKAN_T={"子":[[99,"癸"]],"丑":[[9,"癸"],[12,"辛"],[99,"己"]],"寅":[[7,"戊"],[14,"丙"],[99,"甲"]],"卯":[[99,"乙"]],"辰":[[9,"乙"],[12,"癸"],[99,"戊"]],"巳":[[5,"戊"],[14,"庚"],[99,"丙"]],"午":[[19,"己"],[99,"丁"]],"未":[[9,"丁"],[12,"乙"],[99,"己"]],"申":[[10,"戊"],[13,"壬"],[99,"庚"]],"酉":[[99,"辛"]],"戌":[[9,"辛"],[12,"丁"],[99,"戊"]],"亥":[[12,"甲"],[99,"壬"]]};
 function zoukanByDay(branchChar,day){const t=ZOUKAN_T[branchChar];for(const r of t){if(day<=r[0])return r[1];}return t[t.length-1][1];}
+function zoukanAll(branchChar){return ZOUKAN_T[branchChar].map(r=>r[1]);}
 function keikaDays(y,m,d){const b=new Date(y,m-1,d);const list=allSetsu(y);let prev=list[0];for(const s of list){if(s.date<=b)prev=s;}return Math.max(0,Math.round((b-prev.date)/86400000));}/* 節入り当日＝0日（定気法・sanmei-stock準拠） */
 function setsuDate(year,name){const i=SETSU.findIndex(s=>s[0]===name);const mon=SETSU[i][1];return new Date(year,mon-1,termDay(year,name));}
 function allSetsu(y){let arr=[];for(const yy of [y-1,y,y+1])for(const s of SETSU)arr.push({name:s[0],date:setsuDate(yy,s[0])});arr.sort((a,b)=>a.date-b.date);return arr;}
@@ -403,7 +408,8 @@ function render(s,y,r){
   $("o_kyusei").textContent="本命 "+STAR[r.honmei]+"／月命 "+STAR[r.getsumei];
   $("o_seigetsu").textContent=r.getsumei+"（"+STAR_SHORT[r.getsumei]+"）";
   const kb=kihonsu(y,s.bm,s.bd);
-  $("o_kihon").textContent=kb.sum+"（"+kb.Y+(kb.mc<0?"−"+(-kb.mc):"＋"+kb.mc)+"＋"+s.bd+"）";
+  const _bd=kb.Y+(kb.mc<0?"−"+(-kb.mc):"＋"+kb.mc)+"＋"+s.bd;
+  $("o_kihon").textContent=kb.no+"（"+_bd+(kb.sum>60?"＝"+kb.sum+"−60":"")+"）";
   $("o_kanshiNo").textContent="日"+kanshiNo(r.day.stem,r.day.branch)+"・月"+kanshiNo(r.month.stem,r.month.branch)+"・年"+kanshiNo(r.year.stem,r.year.branch);
   $("o_daikichi").textContent=daikichi(r.honmei);
   $("o_tcs_head").textContent=tenchusatsuName(r.day.stem,r.day.branch);
@@ -417,6 +423,9 @@ function render(s,y,r){
   const z=(p,idEl,idSub)=>{const zi=STEMS.indexOf(zoukanByDay(BRANCHES[p.branch],r.keika));
     $(idEl).innerHTML=kanHtml(zi);$(idSub).textContent=MAIN_STAR[tsuhen(r.day.stem,zi)];};
   z(r.day,"c_dz","c_dz_s");z(r.month,"c_mz","c_mz_s");z(r.year,"c_yz","c_yz_s");
+  $("c_dy").textContent=zoukanAll(BRANCHES[r.day.branch]).join("・");
+  $("c_my").textContent=zoukanAll(BRANCHES[r.month.branch]).join("・");
+  $("c_yy").textContent=zoukanAll(BRANCHES[r.year.branch]).join("・");
   const v=voidBranches(r.day.stem,r.day.branch);
   $("c_tcs").textContent=BRANCHES[v[0]]+" "+BRANCHES[v[1]];
   $("c_tcs_m").textContent=branchMonth(v[0])+"月・"+branchMonth(v[1])+"月";
@@ -535,4 +544,3 @@ $("fileImport").addEventListener("change",e=>{
 </script>
 </body>
 </html>
-

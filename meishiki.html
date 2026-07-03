@@ -314,6 +314,18 @@ function kiunDays(y,m,d,forward){const b=new Date(y,m-1,d);const list=allSetsu(y
   if(forward){for(const s of list){if(s.date>b)return Math.round((s.date-b)/864e5);}return 1;}
   let prev=list[0];for(const s of list){if(s.date<=b)prev=s;}return Math.round((b-prev.date)/864e5);}
 function kiunAge(days){const q=Math.floor(days/3),r2=days%3;return Math.max(1,q+(r2===2?1:0));}
+/* 基本数（実占の宝典P79〜80「日の干支を求める法」）
+   年の係数=その年1月1日の干支番号／月の係数=書籍の表と同一／合計が60を越えたら60を引く */
+const MCOEF_HEI=[-1,30,58,29,59,30,0,31,2,32,3,33];
+const MCOEF_URU=[59,30,59,30,0,31,1,32,3,33,4,34];
+function kihonsu(y,m,d){
+  const leap=(y%4===0&&y%100!==0)||y%400===0;
+  const mc=(leap?MCOEF_URU:MCOEF_HEI)[m-1];
+  const Y=dayIdx(y,1,1)+1;
+  const sum=Y+mc+d;
+  let k=sum;while(k>60)k-=60;while(k<1)k+=60;
+  return {Y,mc,sum,no:k};
+}
 /* 鑑定年の自動判定: 記入日が立春前なら前年 */
 function autoTy(kinyu){const d=kinyu?new Date(kinyu+"T00:00"):new Date();
   let y=d.getFullYear();const m=d.getMonth()+1,dd=d.getDate();
@@ -389,6 +401,9 @@ function render(s,y,r){
   $("o_birth").textContent=toWareki(y)+"（西暦"+y+"年）"+s.bm+"月"+s.bd+"日"
     +(s.bh!=null?"　"+s.bh+"時"+(s.bmin||0)+"分":"")+"　"+(s.sex==="m"?"男性":"女性");
   $("o_kyusei").textContent="本命 "+STAR[r.honmei]+"／月命 "+STAR[r.getsumei];
+  $("o_seigetsu").textContent=r.getsumei+"（"+STAR_SHORT[r.getsumei]+"）";
+  const kb=kihonsu(y,s.bm,s.bd);
+  $("o_kihon").textContent=kb.sum+"（"+kb.Y+(kb.mc<0?"−"+(-kb.mc):"＋"+kb.mc)+"＋"+s.bd+"）";
   $("o_kanshiNo").textContent="日"+kanshiNo(r.day.stem,r.day.branch)+"・月"+kanshiNo(r.month.stem,r.month.branch)+"・年"+kanshiNo(r.year.stem,r.year.branch);
   $("o_daikichi").textContent=daikichi(r.honmei);
   $("o_tcs_head").textContent=tenchusatsuName(r.day.stem,r.day.branch);

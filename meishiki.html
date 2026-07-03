@@ -106,6 +106,12 @@ section h2{font-size:.88rem;border-left:5px solid #7c5a3a;padding-left:6px;margi
     <input type="file" id="fileImport" accept=".json" style="display:none">
     <span id="msg"></span>
   </div>
+  <div class="frow" style="border-top:1px dashed #cfc8b8;padding-top:8px;margin-bottom:0">
+    <div class="fld"><label>登録済みの人（選ぶと読込）</label><select id="people" style="min-width:170px"><option value="">－ 選択してください －</option></select></div>
+    <button class="sub" id="btnSavePerson">現在の内容を登録</button>
+    <button class="sub" id="btnDelPerson">選択中を削除</button>
+    <button class="sub" id="btnExportAll">全員バックアップ</button>
+  </div>
 </div>
 
 <div id="sheet">
@@ -344,6 +350,13 @@ function banSVG(center,ring,haDir,size){
 
 /* ===== UI ===== */
 const $=id=>document.getElementById(id);
+/* 複数人の名簿（localStorage） */
+function loadPeople(){try{return JSON.parse(localStorage.getItem("sanmeiPeople")||"{}");}catch(e){return {};}}
+function savePeople(p){localStorage.setItem("sanmeiPeople",JSON.stringify(p));}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function refreshPeople(sel){const p=loadPeople();
+  $("people").innerHTML='<option value="">－ 選択してください －</option>'
+    +Object.keys(p).sort((a,b)=>a.localeCompare(b,"ja")).map(n=>'<option value="'+esc(n)+'"'+(n===sel?" selected":"")+'>'+esc(n)+'</option>').join("");}
 function val(id){const v=$(id).value;return v===""?null:+v;}
 function gatherInput(){
   return {no:$("no").value,kinyu:$("kinyu").value,name:$("name").value,
@@ -362,8 +375,10 @@ function run(){
   const r=compute(y,s.bm,s.bd,s.bh,s.bmin==null?0:s.bmin,s.sex==="m");
   if(s.tyAuto||!s.ty){s.ty=autoTy(s.kinyu);$("ty").value=s.ty;}
   localStorage.setItem("sanmeiSheet",JSON.stringify(s));
+  let regMsg="";
+  if(s.name){const p=loadPeople();if(p[s.name]){p[s.name]=s;savePeople(p);refreshPeople(s.name);regMsg="／登録内容を更新";}}
   render(s,y,r);
-  $("msg").textContent="作成しました（自動保存済み）";
+  $("msg").textContent="作成しました（自動保存済み"+regMsg+"）";
 }
 
 function render(s,y,r){
@@ -450,6 +465,27 @@ function renderDaiun(s,y,r,v){
 }
 
 $("btnRun").addEventListener("click",run);
+$("btnSavePerson").addEventListener("click",()=>{
+  const s=gatherInput();
+  if(!s.name){$("msg").textContent="登録には氏名の入力が必要です";return;}
+  if(!s.by||!s.bm||!s.bd){$("msg").textContent="生年月日を入力してください";return;}
+  const p=loadPeople();const isNew=!p[s.name];p[s.name]=s;savePeople(p);refreshPeople(s.name);
+  $("msg").textContent="「"+s.name+"」を"+(isNew?"登録しました":"上書きしました")+"（現在"+Object.keys(p).length+"名）";});
+$("people").addEventListener("change",()=>{
+  const n=$("people").value;if(!n)return;
+  const p=loadPeople();if(p[n]){applyInput(p[n]);run();$("msg").textContent="「"+n+"」を読み込みました";}});
+$("btnDelPerson").addEventListener("click",()=>{
+  const n=$("people").value;if(!n){$("msg").textContent="削除する人を選択してください";return;}
+  if(!confirm("「"+n+"」の登録を削除しますか？"))return;
+  const p=loadPeople();delete p[n];savePeople(p);refreshPeople();
+  $("msg").textContent="「"+n+"」を削除しました";});
+$("btnExportAll").addEventListener("click",()=>{
+  const p=loadPeople();
+  if(!Object.keys(p).length){$("msg").textContent="登録された人がいません";return;}
+  const blob=new Blob([JSON.stringify({people:p},null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="命式シート_全員バックアップ.json";a.click();
+  $("msg").textContent=Object.keys(p).length+"名分をバックアップしました";});
 $("tyAuto").addEventListener("change",()=>{$("ty").disabled=$("tyAuto").checked;if($("by").value)run();});
 $("kinyu").addEventListener("change",()=>{if($("tyAuto").checked&&$("by").value)run();});
 $("btnPrint").addEventListener("click",()=>window.print());
@@ -460,8 +496,16 @@ $("btnExport").addEventListener("click",()=>{
 $("btnImport").addEventListener("click",()=>$("fileImport").click());
 $("fileImport").addEventListener("change",e=>{
   const f=e.target.files[0];if(!f)return;
-  const rd=new FileReader();rd.onload=()=>{try{applyInput(JSON.parse(rd.result));run();}catch(err){$("msg").textContent="読み込み失敗: "+err.message;}};
-  rd.readAsText(f);});
+  const rd=new FileReader();rd.onload=()=>{try{
+    const data=JSON.parse(rd.result);
+    if(data.people){const p=loadPeople();let n=0;for(const k in data.people){p[k]=data.people[k];n++;}savePeople(p);refreshPeople();
+      $("msg").textContent=n+"名分を取り込みました（リストから選択できます）";}
+    else{applyInput(data);
+      if(data.name){const p=loadPeople();p[data.name]=data;savePeople(p);refreshPeople(data.name);}
+      run();}
+    }catch(err){$("msg").textContent="読み込み失敗: "+err.message;}};
+  rd.readAsText(f);
+  e.target.value="";});
 
 (function(){
   const saved=localStorage.getItem("sanmeiSheet");
@@ -470,6 +514,7 @@ $("fileImport").addEventListener("change",e=>{
   if(!$("kinyu").value)$("kinyu").value=t.getFullYear()+"-"+String(t.getMonth()+1).padStart(2,"0")+"-"+String(t.getDate()).padStart(2,"0");
   if(!$("ty").value)$("ty").value=autoTy($("kinyu").value);
   $("ty").disabled=$("tyAuto").checked;
+  refreshPeople();
   if($("by").value&&$("bm").value&&$("bd").value)run();
 })();
 </script>

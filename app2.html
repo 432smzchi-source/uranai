@@ -178,6 +178,11 @@ function zoukanByDay(branchChar,day){const t=ZOUKAN_T[branchChar];for(const r of
 function keikaDays(y,m,d){const b=new Date(y,m-1,d);const list=allSetsu(y);let prev=list[0];for(const s of list){if(s.date<=b)prev=s;}return Math.max(0,Math.round((b-prev.date)/86400000));}/* 節入り当日＝0日（定気法・sanmei-stock準拠） */
 function setsuDate(year,name){const i=SETSU.findIndex(s=>s[0]===name);const mon=SETSU[i][1];return new Date(year,mon-1,termDay(year,name));}
 function allSetsu(y){let arr=[];for(const yy of [y-1,y,y+1])for(const s of SETSU)arr.push({name:s[0],date:setsuDate(yy,s[0])});arr.sort((a,b)=>a.date-b.date);return arr;}
+/* 起運年齢：順行=次の節入りまで／逆行=前の節入りからの日数 ÷3（余り1日切捨て・余り2日切上げ、最低1歳）。命式シートと同一ルール */
+function kiunDays(y,m,d,forward){const b=new Date(y,m-1,d);const list=allSetsu(y);
+  if(forward){for(const s of list){if(s.date>b)return Math.round((s.date-b)/864e5);}return 1;}
+  let prev=list[0];for(const s of list){if(s.date<=b)prev=s;}return Math.round((b-prev.date)/864e5);}
+function kiunAge(days){const q=Math.floor(days/3),r2=days%3;return Math.max(1,q+(r2===2?1:0));}
 /* 大運：命式の月柱（干支）を起点とし、0歳から10年ごとに順行／逆行で進める。 */
 function daiun(y,m,d,ys,mp,male){const yang=ys%2===0;const forward=(yang&&male)||(!yang&&!male);
   let runs=[];
@@ -969,11 +974,12 @@ function kantei(y,m,d,hh,mm,male,ty){
     +(nmt?'<p class="muted">★直近の「月の天中殺」：'+nmt.s+' 〜 '+nmt.e+'</p>':'')
     +'<p class="muted">'+(shukumei?'年柱または月柱の地支が空亡にあたるため、<b>宿命天中殺を持っています</b>。':'あなたは宿命天中殺がありません。')+'</p>'
     +'<p class="hint">天中殺は日柱の干支が属する旬で抜けている二支（空亡）です。該当する年・月・大運は運気が不安定になりやすく、充電や学びに向く時期とされます。</p></div>';
+  const kiunD=kiunDays(y,m,d,r.daiun.forward);const k0=kiunAge(kiunD);
   let dr='<div class="card"><h2>大運（10年ごとの運勢の流れ）</h2>'
-    +'<p class="muted">'+(r.daiun.forward?"順行":"逆行")+' ／ 月柱（'+r.month.k+'）を起点に0歳から10年ごと。現在の年齢の目安：'+age+'歳<br>天中殺（日柱基準）：<b>'+tcsName+'</b> ／ この支（'+BRANCHES[tcsV[0]]+'・'+BRANCHES[tcsV[1]]+'）にあたる大運は天中殺期です。</p>'
-    +'<table><tr><th>開始年齢</th><th>干支</th><th>通変星（主星）</th><th>十二運（従星）</th><th>人生の季節</th><th>この10年の傾向</th></tr>';
+    +'<p class="muted">'+(r.daiun.forward?"順行":"逆行")+' ／ 起運 '+k0+'歳（'+(r.daiun.forward?"次の節入りまで":"前の節入りから")+kiunD+'日÷3）／ 月柱（'+r.month.k+'）を起点に、'+k0+'歳・'+(k0+10)+'歳・'+(k0+20)+'歳…で切替。現在の年齢の目安：'+age+'歳<br>天中殺（日柱基準）：<b>'+tcsName+'</b> ／ この支（'+BRANCHES[tcsV[0]]+'・'+BRANCHES[tcsV[1]]+'）にあたる大運は天中殺期です。</p>'
+    +'<table><tr><th>年齢</th><th>干支</th><th>通変星（主星）</th><th>十二運（従星）</th><th>人生の季節</th><th>この10年の傾向</th></tr>';
   r.daiun.runs.forEach((rn,i)=>{const tsu=tsuhen(r.dayStem,rn.stem);const un=juniun(r.dayStem,rn.branch);
-    const next=r.daiun.runs[i+1];const isNow=age>=rn.age&&(!next||age<next.age);
+    const stAge=i===0?0:k0+10*(i-1);const enAge=k0+10*i-1;const isNow=age>=stAge&&age<=enAge;
     const isTcs=(rn.branch===tcsV[0]||rn.branch===tcsV[1]);
     const tk=tokushusei(rn.kanshi);
     const hasIjo=tk.some(t=>t.name==="異常干支"||t.name==="暗合異常干支");
@@ -981,13 +987,13 @@ function kantei(y,m,d,hh,mm,male,ty){
     if(isTcs)kanshiCell+='<br><span class="tcs-tag">天中殺</span>';
     tk.forEach(t=>{const ij=(t.name==="異常干支"||t.name==="暗合異常干支");kanshiCell+=ij?'<br><span style="display:inline-block;font-size:.66rem;background:#7a3aa0;color:#fff;border-radius:6px;padding:1px 7px;margin-top:2px;font-weight:bold">◆'+t.name+'</span>':'<br><span class="tok-tag">'+t.type+'「'+t.name+'」</span>';});
     const se=SEASON_OF_BRANCH[rn.branch];
-    dr+='<tr class="'+(isNow?'daiun-now':'')+(isTcs?' tcs-row':'')+'"><td>'+rn.age+'歳'+(isNow?' <span class="tag">現在</span>':'')+'</td><td>'+kanshiCell+'</td><td>'+tsu+'<br><span style="font-size:.72rem;color:#8a8276">'+MAIN_STAR[tsu]+'</span></td><td>'+un+'<br><span style="font-size:.72rem;color:#8a8276">'+SUB_STAR[un]+' '+SUB_INFO[SUB_STAR[un]][1]+'</span></td><td style="font-size:.82rem"><b>'+SEASON_MARK[se[0]]+'</b><br><span style="font-size:.7rem;color:#8a8276">'+se[1]+'</span></td><td style="text-align:left;font-size:.82rem">'+TSU_INFO[tsu]+'</td></tr>';});
+    dr+='<tr class="'+(isNow?'daiun-now':'')+(isTcs?' tcs-row':'')+'"><td style="font-size:.8rem">'+stAge+'〜'+enAge+'歳'+(isNow?'<br><span class="tag">現在</span>':'')+'</td><td>'+kanshiCell+'</td><td>'+tsu+'<br><span style="font-size:.72rem;color:#8a8276">'+MAIN_STAR[tsu]+'</span></td><td>'+un+'<br><span style="font-size:.72rem;color:#8a8276">'+SUB_STAR[un]+' '+SUB_INFO[SUB_STAR[un]][1]+'</span></td><td style="font-size:.82rem"><b>'+SEASON_MARK[se[0]]+'</b><br><span style="font-size:.7rem;color:#8a8276">'+se[1]+'</span></td><td style="text-align:left;font-size:.82rem">'+TSU_INFO[tsu]+'</td></tr>';});
   dr+='<p class="hint">人生の季節は大運の十二支を四季に対応させたものです（寅卯辰＝春／巳午未＝夏／申酉戌＝秋／亥子丑＝冬）。天中殺は日柱の干支が属する旬で抜けている二支（空亡）を指します。干支が<b style="color:#7a3aa0">◆異常干支・◆暗合異常干支</b>にあたる大運は紫のラベルで示しています。</p></div>';
 
   // 運の流れ（後天運：大運→年運→月運→日運）基準日＝年運/月運/吉方の 年・月・日
   const fRefM=6,fRefD=15,fRefY=ty;
   const fRefAge=fRefY-y-((fRefM<m||(fRefM===m&&fRefD<d))?1:0);
-  let curDaiun=null;r.daiun.runs.forEach((rn,i)=>{const nx=r.daiun.runs[i+1];if(fRefAge>=rn.age&&(!nx||fRefAge<nx.age))curDaiun=rn;});
+  let curDaiun=null,curDaiunSt=0,curDaiunEn=0;r.daiun.runs.forEach((rn,i)=>{const st=i===0?0:k0+10*(i-1);const en=k0+10*i-1;if(fRefAge>=st&&fRefAge<=en){curDaiun=rn;curDaiunSt=st;curDaiunEn=en;}});
   const fSolar=monthBranchAndYear(fRefY,fRefM,fRefD);const fYi=yearIdx(fSolar.solarYear);const fMi=monthIdx(fYi%10,fSolar.branch);const fDi=dayIdx(fRefY,fRefM,fRefD);
   const inTcs=b=>(b===tcsV[0]||b===tcsV[1]);
   const flowRow=(lbl,k,stem,branch,extra)=>{const tsu=tsuhen(r.dayStem,stem);const un=juniun(r.dayStem,branch);
@@ -995,7 +1001,7 @@ function kantei(y,m,d,hh,mm,male,ty){
   let flow='<div class="card"><h2>運の流れ（'+fRefY+'/'+fRefM+'/'+fRefD+' 時点｜大運→年→月→日）</h2>'
     +'<p class="muted">入力欄の「年運/月運/吉方の年・月・日」を基準日として、今めぐっている大運・年運・月運・日運を日主（'+STEMS[r.dayStem]+'）から見た流れで表示します。天中殺（'+BRANCHES[tcsV[0]]+'・'+BRANCHES[tcsV[1]]+'）にあたる運は赤帯で示します。</p>'
     +'<table><tr><th>区分</th><th>干支</th><th>通変星（主星）</th><th>十二運（従星）</th><th>基準</th></tr>'
-    +(curDaiun?flowRow('大運（'+curDaiun.age+'歳〜）',curDaiun.kanshi,curDaiun.stem,curDaiun.branch,fRefAge+'歳時点'):'<tr><td>大運</td><td colspan="4" class="muted">立運前</td></tr>')
+    +(curDaiun?flowRow('大運（'+curDaiunSt+'〜'+curDaiunEn+'歳）',curDaiun.kanshi,curDaiun.stem,curDaiun.branch,fRefAge+'歳時点'):'<tr><td>大運</td><td colspan="4" class="muted">立運前</td></tr>')
     +flowRow('年運（'+fSolar.solarYear+'年）',kanshi(fYi),fYi%10,fYi%12,'立春基準')
     +flowRow('月運（'+fSolar.branch+'月）',kanshi(fMi),fMi%10,fMi%12,'節入り基準')
     +flowRow('日運',kanshi(fDi),fDi%10,fDi%12,fRefY+'/'+fRefM+'/'+fRefD)

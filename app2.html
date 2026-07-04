@@ -328,21 +328,21 @@ function meishikiLines(r){
     const rs=branchRels(cols[i][1].branch,cols[j][1].branch);
     rs.forEach((rel,k)=>{const ay=by+(10+(gap-1)*14+k*13),col=RELCOL[rel]||"#b06a3a";arcs+=`<path d="M ${x1} ${by} Q ${mx} ${ay} ${x2} ${by}" fill="none" stroke="${col}" stroke-width="1.8"/><text x="${mx}" y="${ay+11}" text-anchor="middle" font-size="11" font-weight="bold" fill="${col}">${rel}</text>`;});}
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;display:block;margin:4px auto">${arcs}${nodes}</svg>`;}
-/* 人生の季節：大運の十二支を五行の季節に対応させ、各季節の終わり（辰・未・戌・丑）を土用とする。 */
+/* 人生の季節：大運の十二支を四季に対応させる（寅卯辰＝春／巳午未＝夏／申酉戌＝秋／亥子丑＝冬）。 */
 const SEASON_OF_BRANCH={
   2:["春","木性の芽生え。物事を始める成長の時期。"],
   3:["春","木性の成長。勢いづいて伸びていく時期。"],
-  4:["春","春から夏への切り替えの調整期（土用）。"],
+  4:["春","春の締めくくり。成長を土台として固める時期。"],
   5:["夏","火性の活動。外へ広がり活発になる時期。"],
   6:["夏","火性の極み。勢いが盛んな充実の時期。"],
-  7:["夏","夏から秋への切り替えの調整期（土用）。"],
+  7:["夏","夏の締めくくり。活動の成果をまとめる時期。"],
   8:["秋","金性の実り。成熟と収穫に向かう時期。"],
   9:["秋","金性の充実。落ち着きと結実の時期。"],
-  10:["秋","秋から冬への切り替えの調整期（土用）。"],
+  10:["秋","秋の締めくくり。実りを蓄えて整理する時期。"],
   11:["冬","水性の休息。内に力を蓄える時期。"],
   0:["冬","水性の静寂。静かに次へ備える時期。"],
-  1:["冬","冬から春への切り替えの調整期（土用）。"]};
-const SEASON_MARK={"春":"🌱春","夏":"☀夏","秋":"🍂秋","冬":"❄冬","土用":"🟡土用"};
+  1:["冬","冬の締めくくり。蓄えた力を春へつなぐ準備の時期。"]};
+const SEASON_MARK={"春":"🌱春","夏":"☀夏","秋":"🍂秋","冬":"❄冬"};
 
 /* ===== 相性診断ロジック ===== */
 const ELEM_OF_STAR={1:4,2:2,3:0,4:0,5:2,6:3,7:3,8:2,9:1};
@@ -982,7 +982,7 @@ function kantei(y,m,d,hh,mm,male,ty){
     tk.forEach(t=>{const ij=(t.name==="異常干支"||t.name==="暗合異常干支");kanshiCell+=ij?'<br><span style="display:inline-block;font-size:.66rem;background:#7a3aa0;color:#fff;border-radius:6px;padding:1px 7px;margin-top:2px;font-weight:bold">◆'+t.name+'</span>':'<br><span class="tok-tag">'+t.type+'「'+t.name+'」</span>';});
     const se=SEASON_OF_BRANCH[rn.branch];
     dr+='<tr class="'+(isNow?'daiun-now':'')+(isTcs?' tcs-row':'')+'"><td>'+rn.age+'歳'+(isNow?' <span class="tag">現在</span>':'')+'</td><td>'+kanshiCell+'</td><td>'+tsu+'<br><span style="font-size:.72rem;color:#8a8276">'+MAIN_STAR[tsu]+'</span></td><td>'+un+'<br><span style="font-size:.72rem;color:#8a8276">'+SUB_STAR[un]+' '+SUB_INFO[SUB_STAR[un]][1]+'</span></td><td style="font-size:.82rem"><b>'+SEASON_MARK[se[0]]+'</b><br><span style="font-size:.7rem;color:#8a8276">'+se[1]+'</span></td><td style="text-align:left;font-size:.82rem">'+TSU_INFO[tsu]+'</td></tr>';});
-  dr+='<p class="hint">人生の季節は大運の十二支を五行の季節に対応させたものです（寅卯＝春／巳午＝夏／申酉＝秋／亥子＝冬）。各季節の終わりにあたる辰・未・戌・丑は土用（季節の変わり目の調整期）です。天中殺は日柱の干支が属する旬で抜けている二支（空亡）を指します。干支が<b style="color:#7a3aa0">◆異常干支・◆暗合異常干支</b>にあたる大運は紫のラベルで示しています。</p></div>';
+  dr+='<p class="hint">人生の季節は大運の十二支を四季に対応させたものです（寅卯辰＝春／巳午未＝夏／申酉戌＝秋／亥子丑＝冬）。天中殺は日柱の干支が属する旬で抜けている二支（空亡）を指します。干支が<b style="color:#7a3aa0">◆異常干支・◆暗合異常干支</b>にあたる大運は紫のラベルで示しています。</p></div>';
 
   // 運の流れ（後天運：大運→年運→月運→日運）基準日＝年運/月運/吉方の 年・月・日
   const fRefM=6,fRefD=15,fRefY=ty;

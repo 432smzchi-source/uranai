@@ -102,6 +102,7 @@ section h2{font-size:.88rem;border-left:5px solid var(--head);padding-left:6px;m
     <tr><td class="lbl">氏 名</td><td class="val" id="o_name">　</td><td class="lbl">生年月日</td><td class="val" id="o_birth">　</td></tr>
     <tr><td class="lbl">命 式</td><td class="val" id="o_meishiki">　</td><td class="lbl">天中殺</td><td class="val" id="o_tcs">　</td></tr>
     <tr><td class="lbl">大 運</td><td class="val" id="o_daiun">　</td><td class="lbl">鑑定年の年齢</td><td class="val" id="o_age">　</td></tr>
+    <tr><td class="lbl">五行バランス</td><td class="val" id="o_gogyo">　</td><td class="lbl">全体守護神</td><td class="val" id="o_shugo">　</td></tr>
   </table>
 
   <section>
@@ -133,7 +134,8 @@ section h2{font-size:.88rem;border-left:5px solid var(--head);padding-left:6px;m
       <b>律音</b>…同じ干支が重なる。自我が強まり独立・再スタートの気運　<b>納音</b>…引き合いと反発が同居。移動・生活の変化<br>
       <b>対冲</b>…正面衝突・変動・移動（凶）　<b>刑</b>…内側からの摩擦・もめごと（凶）　<b>自刑</b>…自分自身を痛めやすい（凶）<br>
       <b>害</b>…身近な妨害・足の引っぱり（凶）　<b>破</b>…破れ・小さな崩れ・計画変更（小凶）　<b>干合</b>…天干の結び付き。心が引かれる・変化の誘い<br>
-      <b>空亡の年（天中殺）</b>…運気が不安定になりやすく、新しいことは控えめが無難。
+      <b>空亡の年（天中殺）</b>…運気が不安定になりやすく、新しいことは控えめが無難。<br>
+      <b>全体守護神</b>…陰占（日月年の6文字）の五行の過不足から見た、心のバランスを保つ五行。不足する五行＝守護神／多すぎる五行は「剋す」「洩らす」五行が守護神。年干がその五行に当たる年に緑の「守護神」印を表示。
     </div>
   </section>
 
@@ -233,6 +235,23 @@ function autoTy(){const d=new Date();
   let y=d.getFullYear();const m=d.getMonth()+1,dd=d.getDate();
   if(m<2||(m===2&&dd<termDay(y,"立春")))y-=1;return y;}
 
+/* ===== 五行バランス・全体守護神（資料「全体守護神」PDF準拠） =====
+   陰占の日月年6文字（蔵干は使わない）を五行で数え、
+   不足(0個)の五行＝守護神／過多(3個以上)の五行＝剋す・洩らす五行が守護神 */
+const ELEM_STEM=["木","木","火","火","土","土","金","金","水","水"];
+const ELEM_BRANCH=["水","土","木","木","土","火","火","土","金","金","土","水"];
+const GOGYO=["木","火","土","金","水"];
+const GOGYO_ROLE={"木":"福・精神","火":"寿・健康","土":"禄・経済","金":"官・名誉","水":"印・知恵"};
+const G_KOKARERU={"木":"金","火":"水","土":"木","金":"火","水":"土"};/* Xを剋す五行 */
+const G_SEI={"木":"火","火":"土","土":"金","金":"水","水":"木"};/* Xが生む（洩らす先） */
+function gogyoCount(r){const c={"木":0,"火":0,"土":0,"金":0,"水":0};
+  for(const p of [r.year,r.month,r.day]){c[ELEM_STEM[p.stem]]++;c[ELEM_BRANCH[p.branch]]++;}
+  return c;}
+function zentaiShugoshin(c){const set=new Set();const why=[];
+  for(const g of GOGYO){if(c[g]===0){set.add(g);why.push(g+"性が不足");}}
+  for(const g of GOGYO){if(c[g]>=3){set.add(G_KOKARERU[g]);set.add(G_SEI[g]);why.push(g+"性が過多（剋す"+G_KOKARERU[g]+"・洩らす"+G_SEI[g]+"）");}}
+  return {list:GOGYO.filter(g=>set.has(g)),why};}
+
 /* ===== 位相法（既存アプリの表を流用し、干支ペア判定に拡張） ===== */
 const PH_SHIGOU=[[0,1],[2,11],[3,10],[4,9],[5,8],[6,7]];
 const PH_SANGOU=[[8,0,4],[11,3,7],[2,6,10],[5,9,1]];
@@ -288,6 +307,8 @@ function flowData(r,birthAD,s,ty){
     return {run:r.daiun.runs[i],from:k0+10*(i-1),to:k0+10*(i-1)+9,idx:i};};
   const age=ageOf(ty);
   const du=daiunAt(age);
+  const gc=gogyoCount(r);
+  const shugo=zentaiShugoshin(gc);
   const pillars=[
     {key:"year",lbl:"年",stem:r.year.stem,branch:r.year.branch},
     {key:"month",lbl:"月",stem:r.month.stem,branch:r.month.branch},
@@ -300,7 +321,8 @@ function flowData(r,birthAD,s,ty){
     years.push({key:"y"+y,y,lbl:String(y),wareki:warekiShort(y),age:ageOf(y),
       stem:yi%10,branch:yi%12,
       main:MAIN_STAR[tsuhen(ds,yi%10)],sub:SUB_STAR[juniun(ds,yi%12)],
-      tcs:v.includes(yi%12)});}
+      tcs:v.includes(yi%12),
+      shugo:shugo.list.includes(ELEM_STEM[yi%10])});}
   /* 位相法：命式内部・大運vs命式・各年vs命式＋大運 */
   const rels=[];
   const addRels=(a,b)=>{const rs=pairRels(a.stem,a.branch,b.stem,b.branch);
@@ -308,7 +330,7 @@ function flowData(r,birthAD,s,ty){
   for(let i=0;i<pillars.length;i++)for(let j=i+1;j<pillars.length;j++)addRels(pillars[i],pillars[j]);
   for(const p of pillars)addRels(duCol,p);
   for(const yc of years){for(const p of pillars)addRels(yc,p);addRels(yc,duCol);}
-  return {v,k0,days,age,du,duCol,pillars,years,rels,daiunAt};}
+  return {v,k0,days,age,du,duCol,pillars,years,rels,daiunAt,gc,shugo};}
 
 /* ===== 図（SVG） ===== */
 const RELCOL={"支合":"#2a9d8f","半会":"#3a7c5a","大半会":"#1f6b3a","対冲":"#c0392b","刑":"#7a3aa0","自刑":"#7a3aa0","害":"#b03a7a","破":"#d98a2b","干合":"#3a6ab0","納音":"#2a6f8f","律音":"#6b4fa0"};
@@ -375,6 +397,7 @@ function flowSVG(F,r,ty){
       +'<text x="'+x+'" y="'+(shiTop+25)+'" text-anchor="middle" font-size="20" font-weight="bold" fill="#2b2b2b">'+BRANCHES[c.branch]+'</text>';
     if(isVoid){g+='<circle cx="'+x+'" cy="'+(shiTop+16)+'" r="15" fill="none" stroke="#c0392b" stroke-width="1.8"/>'
       +'<text x="'+x+'" y="'+voidLblY+'" text-anchor="middle" font-size="9" fill="#c0392b" font-weight="bold" style="paint-order:stroke;stroke:#fff;stroke-width:3">'+(c.type==="daiun"?"大運天中殺":"空亡")+'</text>';}
+    else if(c.type==="year"&&c.shugo)g+='<text x="'+x+'" y="'+voidLblY+'" text-anchor="middle" font-size="9" fill="#2a5c3a" font-weight="bold" style="paint-order:stroke;stroke:#fff;stroke-width:3">守護神</text>';
     /* 星（大運・年運）：ボックスの右横 */
     if(c.main)g+='<text x="'+(x+box/2+3)+'" y="'+(kanTop+14)+'" font-size="9" fill="#31427c">'+c.main[0]+'</text>'
       +'<text x="'+(x+box/2+3)+'" y="'+(shiTop+14)+'" font-size="9" fill="#b04a3a">'+c.sub[1]+'</text>';
@@ -394,6 +417,10 @@ function buildComment(F,r,ty){
   const duk=kanshi(combine(F.duCol.stem,F.duCol.branch));
   lines.push("現在の大運は「"+duk+"」（"+F.duCol.from+"〜"+F.duCol.to+"才／"+F.duCol.main+"・"+F.duCol.sub+"）。"
     +(F.duCol.tcs?"この大運は【大運天中殺】に当たるため、10年を通して土台が不安定になりやすく、無理な拡大より守りが大切です。":""));
+  if(F.shugo.list.length)
+    lines.push("五行バランスは "+GOGYO.map(g=>g+F.gc[g]).join("・")+"。全体守護神は "
+      +F.shugo.list.map(g=>g+"（"+GOGYO_ROLE[g]+"）").join("・")+"（"+F.shugo.why.join("／")+"）。"
+      +"この五行を日頃の生活に取り入れると心のバランスを保ちやすくなります。");
   for(const yc of F.years){
     const rs=relsOfYear(F,yc);
     const kichi=rs.filter(x=>KICHI_RELS.includes(x.name)||x.name==="干合");
@@ -402,6 +429,7 @@ function buildComment(F,r,ty){
     let t=yc.y+"年（"+yc.wareki+"・"+kanshi(combine(yc.stem,yc.branch))+"・"+yc.age+"才）：";
     const parts=[];
     if(yc.tcs)parts.push("【空亡の年（天中殺）】新しい事や大きな決断は控えめに");
+    if(yc.shugo)parts.push("年干"+STEMS[yc.stem]+"が全体守護神の五行（"+ELEM_STEM[yc.stem]+"）に当たり、支えを得やすい年");
     if(kyo.length)parts.push(kyo.map(x=>PILLAR_LBL[x.target]+"と"+x.name).join("・")+"があり、変動・摩擦が出やすい");
     if(kichi.length)parts.push(kichi.map(x=>PILLAR_LBL[x.target]+"と"+x.name).join("・")+"で、縁や協力がまとまりやすい");
     if(other.length)parts.push(other.map(x=>PILLAR_LBL[x.target]+"と"+relDisp(x.name)).join("・")+"（変化・再スタートの気運）");
@@ -451,17 +479,22 @@ function render(s,y,r,ty,F){
   $("o_daiun").textContent=(r.daiun.forward?"順行":"逆行")+"・起運 "+F.k0+"才　→　現在 "+kanshi(combine(F.duCol.stem,F.duCol.branch))+"（"+F.duCol.from+"〜"+F.duCol.to+"才）"
     +(F.duCol.tcs?"《大運天中殺》":"");
   $("o_age").textContent=ty+"年時点　"+F.age+"才";
+  $("o_gogyo").textContent=GOGYO.map(g=>g+F.gc[g]).join("・");
+  $("o_shugo").textContent=F.shugo.list.length
+    ?F.shugo.list.map(g=>g+"（"+GOGYO_ROLE[g]+"）").join("・")+"　※"+F.shugo.why.join("／")
+    :"大きな偏りなし";
   $("chartLbl").textContent=toWareki(ty)+"（"+ty+"）〜"+toWareki(ty+4)+"（"+(ty+4)+"）";
   $("chartwrap").innerHTML=flowSVG(F,r,ty);
   /* 一覧表 */
-  let h='<tr><th style="width:7em">年</th><th style="width:4.5em">干支</th><th style="width:3.5em">年齢</th><th style="width:7em">年運の星</th><th>命式・大運との位相法</th><th style="width:4.5em">天中殺</th></tr>';
+  let h='<tr><th style="width:7em">年</th><th style="width:4.5em">干支</th><th style="width:3.5em">年齢</th><th style="width:7em">年運の星</th><th>命式・大運との位相法</th><th style="width:5em">印</th></tr>';
   for(const yc of F.years){
+    const tags=(yc.tcs?'<span class="tag red">空亡</span>':'')+(yc.shugo?'<span class="tag grn">守護神</span>':'');
     h+='<tr'+(yc.tcs?' class="void"':'')+'><td>'+yc.y+'年（'+yc.wareki+'）</td>'
       +'<td class="kanji" style="font-weight:bold">'+kanshi(combine(yc.stem,yc.branch))+'</td>'
       +'<td>'+yc.age+'才</td>'
       +'<td style="font-size:.72rem">'+yc.main+'・'+yc.sub+'</td>'
       +'<td class="lft">'+esc(relText(F,yc))+'</td>'
-      +'<td>'+(yc.tcs?'<span class="tag red">空亡</span>':'－')+'</td></tr>';}
+      +'<td>'+(tags||'―')+'</td></tr>';}
   $("reltbl").innerHTML=h;
   /* 解説 */
   $("comment").innerHTML=buildComment(F,r,ty).map(t=>esc(t)).join("<br>");

@@ -145,7 +145,7 @@
       <div class="fld"><label>日</label><input type="number" id="hsD" min="1" max="31"></div>
     </div>
     <button class="go" onclick="calcHoui()">方位を算出する</button>
-    <p class="hint">※住所検索には国土地理院の住所検索API（無料）を利用します。入力した住所のみがインターネット経由で送信されます（生年月日などは送信されません）。</p>
+    <p class="hint">※住所検索には国土地理院またはOpenStreetMap（Nominatim）の無料APIを利用します。入力した住所のみがインターネット経由で送信されます（生年月日などは送信されません）。</p>
   </div>
   <div id="houiOut"></div>
 </div>
@@ -1155,14 +1155,25 @@ function houiBoundaryDist(angle,mode){
   const a=((angle%360)+360)%360;
   return Math.min.apply(null,houiBounds(mode).map(x=>{let d=Math.abs(a-x)%360;return d>180?360-d:d;}));
 }
-/* 国土地理院 住所検索API（ジオコーディング）。座標は[経度,緯度]の順で返る点に注意 */
+/* 住所検索（ジオコーディング）：国土地理院APIを優先し、
+   利用不可（サイト経由では503が返ることがある）や該当なしの場合は
+   OpenStreetMap（Nominatim）へ自動フォールバック。座標は[経度,緯度]の順に注意 */
 async function houiGeocode(q){
-  const res=await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q="+encodeURIComponent(q));
-  if(!res.ok)throw new Error("検索サーバーに接続できませんでした（HTTP "+res.status+"）");
-  const js=await res.json();
-  if(!Array.isArray(js)||js.length===0)return null;
-  const g=js[0];
-  return {lon:g.geometry.coordinates[0],lat:g.geometry.coordinates[1],name:(g.properties&&g.properties.title)||q};
+  try{
+    const res=await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q="+encodeURIComponent(q));
+    if(res.ok){
+      const js=await res.json();
+      if(Array.isArray(js)&&js.length){
+        const g=js[0];
+        return {lon:g.geometry.coordinates[0],lat:g.geometry.coordinates[1],name:(g.properties&&g.properties.title)||q,src:"国土地理院"};
+      }
+    }
+  }catch(e){}
+  const res2=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=jp&q="+encodeURIComponent(q));
+  if(!res2.ok)throw new Error("検索サーバーに接続できませんでした（HTTP "+res2.status+"）");
+  const js2=await res2.json();
+  if(!Array.isArray(js2)||js2.length===0)return null;
+  return {lon:+js2[0].lon,lat:+js2[0].lat,name:js2[0].display_name||q,src:"OpenStreetMap"};
 }
 /* 方位盤SVG（北が上）：8方位の区切り線・境界角度・行先セクター強調・行先方向の矢印 */
 function houiBanSVG(angle,mode,dirIdx){
@@ -1216,7 +1227,7 @@ async function calcHoui(){
   try{localStorage.setItem("houi_from",from);localStorage.setItem("houi_mag",useMag?"1":"0");localStorage.setItem("houi_div",mode);}catch(e){}
   out.innerHTML='<div class="card"><p class="muted">住所を検索しています…</p></div>';
   let A,B;
-  try{A=await houiGeocode(from);B=await houiGeocode(to);}
+  try{A=await houiGeocode(from);if(A&&A.src==="OpenStreetMap")await new Promise(r=>setTimeout(r,1100));B=await houiGeocode(to);}
   catch(e){out.innerHTML='<div class="card"><div class="warn-box"><b>住所検索に失敗しました。</b>通信環境（インターネット接続）をご確認のうえ、時間をおいてお試しください。<br><span class="muted">'+e.message+'</span></div></div>';return;}
   if(!A||!B){out.innerHTML='<div class="card"><div class="warn-box"><b>'+(!A?"起点":"行先")+'の住所が見つかりませんでした。</b>都道府県名から書く・番地を減らす・地名の表記を変える、などでお試しください。</div></div>';return;}
   const trueBearing=houiBearing(A.lat,A.lon,B.lat,B.lon);
@@ -1252,7 +1263,7 @@ async function calcHoui(){
     kichiH='<p class="hint" style="margin-top:10px">生年月日が未入力のため、吉方位の判定は省略しました。生年月日を入力して再度算出すると、調べる年月日の吉凶も表示されます。</p>';
   }
   out.innerHTML='<div class="card"><h2>方位の算出結果</h2>'
-    +'<p class="muted">起点：'+A.name+'<br>行先：'+B.name+'<br><span style="font-size:.74rem">※国土地理院の住所検索で見つかった地点です。意図した場所と一致しているか確認してください。</span></p>'
+    +'<p class="muted">起点：'+A.name+'（'+A.src+'）<br>行先：'+B.name+'（'+B.src+'）<br><span style="font-size:.74rem">※住所検索で見つかった地点です。意図した場所と一致しているか確認してください。地図データ：国土地理院／© OpenStreetMap contributors</span></p>'
     +'<div style="text-align:center;margin:4px 0 0"><span style="font-size:2.4rem;font-weight:bold;color:var(--accent);letter-spacing:.08em">'+dirName+'</span></div>'
     +houiBanSVG(bearing,mode,si)
     +'<div class="stars">'

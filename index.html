@@ -18,6 +18,7 @@
   .row{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
   .fld{display:flex;flex-direction:column;}
   input[type=number]{width:90px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:1rem;}
+  input[type=text]{width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:1rem;}
   .seg{display:flex;gap:6px;}
   .seg button{padding:8px 16px;border:1px solid var(--accent2);background:#fff;color:var(--accent);border-radius:8px;cursor:pointer;font-size:.9rem;}
   .seg button.on{background:var(--accent);color:#fff;}
@@ -138,6 +139,39 @@
     <button class="go" onclick="searchGoodDays()" style="background:#3a7c5a">この日から30日間の「吉方位に良い日」を探す</button>
   </div>
   <div id="today"></div>
+
+  <div class="card">
+    <h2>方位の正確な算出（住所から）</h2>
+    <p class="muted">起点（自宅など）と行先の住所から、起点から見た行先の方位を正確に算出します。あなたの生年月日（一番上の欄）をもとに、その方位が「調べる年月日」の吉方位かどうかを、該当年の年盤・月盤・日盤の三盤で判定します。</p>
+    <div class="row">
+      <div class="fld" style="flex:1;min-width:260px"><label>起点住所（自宅など・次回から自動入力）</label><input type="text" id="hsFrom" placeholder="例：東京都千代田区丸の内1-1"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="fld" style="flex:1;min-width:260px"><label>行先住所</label><input type="text" id="hsTo" placeholder="例：大阪府大阪市北区梅田3-1-1"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="fld"><label>基準の北（流派設定）</label>
+        <select id="hsMag" style="padding:8px;border:1px solid var(--line);border-radius:8px;font-size:.95rem">
+          <option value="0">真北基準（補正なし）</option>
+          <option value="1">磁北基準（磁気偏角を補正）</option>
+        </select>
+      </div>
+      <div class="fld"><label>方位の分割</label>
+        <select id="hsDiv" style="padding:8px;border:1px solid var(--line);border-radius:8px;font-size:.95rem">
+          <option value="kigaku">気学式（東西南北30度・四隅60度）</option>
+          <option value="equal">45度均等の8方位</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div class="fld"><label>調べる年（引っ越し・旅行は予定日を）</label><input type="number" id="hsY" min="1901" max="2100"></div>
+      <div class="fld"><label>月</label><input type="number" id="hsM" min="1" max="12"></div>
+      <div class="fld"><label>日</label><input type="number" id="hsD" min="1" max="31"></div>
+    </div>
+    <button class="go" onclick="calcHoui()">方位を算出する</button>
+    <p class="hint">※住所検索には国土地理院の住所検索API（無料）を利用します。入力した住所のみがインターネット経由で送信されます（生年月日などは送信されません）。</p>
+  </div>
+  <div id="houiOut"></div>
 </div>
 
 <footer>
@@ -1221,6 +1255,179 @@ function run(){
   document.getElementById("result").innerHTML=mei+sanmeiH+tcsCard+suuriH+rikushinH+stars+chara+tokusei+warn+dr+flow+fr+kh+kigaku;
   document.getElementById("result").scrollIntoView({behavior:"smooth"});
 }
+/* ============================================================
+   方位算出モジュール（住所→方位角・距離・九星気学の方位判定）
+   ※占いアプリ.html／占いアプリ2.html 共通コード。
+     修正するときは必ず同じ内容を両方のファイルに反映すること。
+   依存する既存関数・定数：DIRS STAR BRANCHES dayIdx honmei yearIdx compute
+     monthBranchAndYear monthChartCentral dayCentralStar houiEval sanbanJudge
+     HOUTOKU KYOSATSU_INFO
+   ============================================================ */
+const HOUI_RAD=Math.PI/180;
+/* 大圏コースの初期方位角（球面三角法）：真北基準0〜360度 */
+function houiBearing(lat1,lon1,lat2,lon2){
+  const f1=lat1*HOUI_RAD,f2=lat2*HOUI_RAD,dl=(lon2-lon1)*HOUI_RAD;
+  const th=Math.atan2(Math.sin(dl)*Math.cos(f2),Math.cos(f1)*Math.sin(f2)-Math.sin(f1)*Math.cos(f2)*Math.cos(dl));
+  return ((th/HOUI_RAD)%360+360)%360;
+}
+/* Haversine公式による大圏距離（km） */
+function houiDistanceKm(lat1,lon1,lat2,lon2){
+  const R=6371.0088,f1=lat1*HOUI_RAD,f2=lat2*HOUI_RAD,df=(lat2-lat1)*HOUI_RAD,dl=(lon2-lon1)*HOUI_RAD;
+  const a=Math.sin(df/2)*Math.sin(df/2)+Math.cos(f1)*Math.cos(f2)*Math.sin(dl/2)*Math.sin(dl/2);
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+/* 磁気偏角（度・西偏＝マイナス）：主要地点テーブルの距離加重補間（簡易近似・±0.5度程度）
+   [緯度, 経度, 偏角] 札幌/釧路/青森/仙台/新潟/金沢/東京/名古屋/大阪/広島/福岡/鹿児島/那覇/石垣 */
+const HOUI_MAG_TABLE=[
+ [43.06,141.35,-10.0],[42.98,144.38,-10.6],[40.82,140.74,-9.6],[38.27,140.87,-9.2],
+ [37.90,139.02,-8.8],[36.59,136.63,-8.4],[35.68,139.77,-8.0],[35.18,136.91,-8.0],
+ [34.69,135.50,-8.0],[34.40,132.46,-7.6],[33.59,130.40,-7.3],[31.56,130.56,-6.9],
+ [26.21,127.68,-5.0],[24.34,124.16,-4.4]];
+function houiMagDecl(lat,lon){
+  let num=0,den=0;
+  for(let i=0;i<HOUI_MAG_TABLE.length;i++){
+    const la=HOUI_MAG_TABLE[i][0],lo=HOUI_MAG_TABLE[i][1],dd=HOUI_MAG_TABLE[i][2];
+    const dy=la-lat,dx=(lo-lon)*Math.cos(lat*HOUI_RAD),dist2=dy*dy+dx*dx;
+    if(dist2<1e-8)return dd;
+    const w=1/dist2;num+=w*dd;den+=w;}
+  return num/den;
+}
+/* 8方位の境界角度（DIRS[i] の区画は bounds[i]〜bounds[(i+1)%8]） */
+function houiBounds(mode){return mode==="equal"?[337.5,22.5,67.5,112.5,157.5,202.5,247.5,292.5]:[345,15,75,105,165,195,255,285];}
+/* 方位角→8方位の区画番号（DIRSの添字） */
+function houiSector(angle,mode){
+  const b=houiBounds(mode),a=((angle%360)+360)%360;
+  for(let i=0;i<8;i++){const s=b[i],e=b[(i+1)%8];
+    if(s<e?(a>=s&&a<e):(a>=s||a<e))return i;}
+  return 0;
+}
+/* 最寄りの境界線までの角度差（境界警告用） */
+function houiBoundaryDist(angle,mode){
+  const a=((angle%360)+360)%360;
+  return Math.min.apply(null,houiBounds(mode).map(x=>{let d=Math.abs(a-x)%360;return d>180?360-d:d;}));
+}
+/* 国土地理院 住所検索API（ジオコーディング）。座標は[経度,緯度]の順で返る点に注意 */
+async function houiGeocode(q){
+  const res=await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q="+encodeURIComponent(q));
+  if(!res.ok)throw new Error("検索サーバーに接続できませんでした（HTTP "+res.status+"）");
+  const js=await res.json();
+  if(!Array.isArray(js)||js.length===0)return null;
+  const g=js[0];
+  return {lon:g.geometry.coordinates[0],lat:g.geometry.coordinates[1],name:(g.properties&&g.properties.title)||q};
+}
+/* 方位盤SVG（北が上）：8方位の区切り線・境界角度・行先セクター強調・行先方向の矢印 */
+function houiBanSVG(angle,mode,dirIdx){
+  const cx=130,cy=130,r=96;
+  const P=(t,rr)=>[+(cx+rr*Math.sin(t*HOUI_RAD)).toFixed(1),+(cy-rr*Math.cos(t*HOUI_RAD)).toFixed(1)];
+  const b=houiBounds(mode);
+  let s='<svg viewBox="0 0 260 260" style="width:230px;max-width:100%;display:block;margin:8px auto">';
+  s+='<circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#fbf8f3" stroke="#c9c0ae" stroke-width="1.5"/>';
+  const ss=b[dirIdx],span=((b[(dirIdx+1)%8]-ss)+360)%360,p1=P(ss,r),p2=P((ss+span)%360,r);
+  s+='<path d="M'+cx+' '+cy+' L'+p1[0]+' '+p1[1]+' A'+r+' '+r+' 0 '+(span>180?1:0)+' 1 '+p2[0]+' '+p2[1]+' Z" fill="#e7dcc8" opacity=".9"/>';
+  b.forEach(x=>{const q=P(x,r),t=P(x,r+12);
+    s+='<line x1="'+cx+'" y1="'+cy+'" x2="'+q[0]+'" y2="'+q[1]+'" stroke="#c9c0ae" stroke-width="1"/>'
+      +'<text x="'+t[0]+'" y="'+(t[1]+3)+'" text-anchor="middle" font-size="8" fill="#a99f8d">'+x+'°</text>';});
+  DIRS.forEach((dn,i)=>{const s2=b[i],sp2=((b[(i+1)%8]-s2)+360)%360,q=P((s2+sp2/2)%360,r-20);
+    s+='<text x="'+q[0]+'" y="'+(q[1]+4)+'" text-anchor="middle" font-size="'+(i===dirIdx?13:11)+'"'+(i===dirIdx?' font-weight="bold"':'')+' fill="'+(i===dirIdx?'#7c5a3a':'#8a8276')+'">'+dn+'</text>';});
+  const tip=P(angle,r-6),h1=P(angle-5,r-24),h2=P(angle+5,r-24),tail=P(angle,r-22);
+  s+='<line x1="'+cx+'" y1="'+cy+'" x2="'+tail[0]+'" y2="'+tail[1]+'" stroke="#b0393f" stroke-width="2.5"/>'
+    +'<polygon points="'+tip[0]+','+tip[1]+' '+h1[0]+','+h1[1]+' '+h2[0]+','+h2[1]+'" fill="#b0393f"/>'
+    +'<circle cx="'+cx+'" cy="'+cy+'" r="3.5" fill="#5a4632"/></svg>';
+  return s;
+}
+/* 指定方位の指定日の吉凶（該当年の年盤・月盤・日盤＋三盤総合判定）。年・月は節入りで切替 */
+function houiKichiOn(H,M,dirIdx,y,m,d){
+  const tmb=monthBranchAndYear(y,m,d),sy=tmb.solarYear;
+  const ye=houiEval(H,M,honmei(sy),yearIdx(sy)%12);
+  const mcc=monthChartCentral(sy,tmb.branch);
+  const me=houiEval(H,M,mcc,BRANCHES.indexOf(tmb.branch));
+  const dcs=dayCentralStar(y,m,d);
+  const de=houiEval(H,M,dcs.c,dayIdx(y,m,d)%12);
+  return {date:y+"/"+m+"/"+d,sy:sy,ye:ye[dirIdx],me:me[dirIdx],de:de[dirIdx],judge:sanbanJudge(ye[dirIdx],me[dirIdx],de[dirIdx])};
+}
+/* 生年月日の取得：単体版は一番上の欄（y/m/d）、3名版は鑑定①（y1/m1/d1）を使用 */
+function _houiBirth(){
+  const g=id=>{const e=document.getElementById(id);return e?+e.value:NaN;};
+  let y=g("y"),m=g("m"),d=g("d"),tag="あなた";
+  if(!y||!m||!d){y=g("y1");m=g("m1");d=g("d1");tag="鑑定①";}
+  if(!y||!m||!d)return null;
+  const r=compute(y,m,d,null,0,true);
+  return {H:r.honmei,M:r.getsumei,tag:tag};
+}
+/* メイン：住所→方位算出→表示 */
+async function calcHoui(){
+  const from=(document.getElementById("hsFrom").value||"").trim();
+  const to=(document.getElementById("hsTo").value||"").trim();
+  const useMag=document.getElementById("hsMag").value==="1";
+  const mode=document.getElementById("hsDiv").value;
+  const qy=+document.getElementById("hsY").value,qm=+document.getElementById("hsM").value,qd=+document.getElementById("hsD").value;
+  const out=document.getElementById("houiOut");
+  if(!from||!to){alert("起点住所と行先住所を入力してください");return;}
+  if(!qy||!qm||!qd){alert("調べる年月日を入力してください（引っ越し・旅行なら予定日、日常の外出なら今日）");return;}
+  try{localStorage.setItem("houi_from",from);localStorage.setItem("houi_mag",useMag?"1":"0");localStorage.setItem("houi_div",mode);}catch(e){}
+  out.innerHTML='<div class="card"><p class="muted">住所を検索しています…</p></div>';
+  let A,B;
+  try{A=await houiGeocode(from);B=await houiGeocode(to);}
+  catch(e){out.innerHTML='<div class="card"><div class="warn-box"><b>住所検索に失敗しました。</b>通信環境（インターネット接続）をご確認のうえ、時間をおいてお試しください。<br><span class="muted">'+e.message+'</span></div></div>';return;}
+  if(!A||!B){out.innerHTML='<div class="card"><div class="warn-box"><b>'+(!A?"起点":"行先")+'の住所が見つかりませんでした。</b>都道府県名から書く・番地を減らす・地名の表記を変える、などでお試しください。</div></div>';return;}
+  const trueBearing=houiBearing(A.lat,A.lon,B.lat,B.lon);
+  const dist=houiDistanceKm(A.lat,A.lon,B.lat,B.lon);
+  let decl=0,bearing=trueBearing;
+  if(useMag){decl=houiMagDecl(A.lat,A.lon);bearing=((trueBearing-decl)%360+360)%360;}
+  const si=houiSector(bearing,mode),dirName=DIRS[si];
+  const bd=houiBoundaryDist(bearing,mode);
+  const warnH=bd<=3?'<div class="warn-box" style="margin-top:10px"><b>⚠ 方位の境界に近いため注意。</b>区切り線まで約'+bd.toFixed(1)+'度しかなく、測り方や流派（真北／磁北、分割方式）によって隣の方位に変わる可能性があります。</div>':'';
+  const P=_houiBirth();
+  let kichiH;
+  if(P){
+    const K=houiKichiOn(P.H,P.M,si,qy,qm,qd);
+    const lab=(x,ha)=>'<span style="color:'+(x.kichi?'#2f7a4f':'#b0393f')+';font-weight:bold">'+x.label.replace("破",ha)+'</span>（'+STAR[x.star]+'）';
+    const mk=b=>b?'<span style="color:#2f7a4f;font-weight:bold">○ 可</span>':'<span style="color:#b0393f;font-weight:bold">× 不可</span>';
+    let yearInfo;
+    if(K.ye.kichi){
+      yearInfo='<p style="margin:6px 0 0;font-size:.86rem"><b>'+K.sy+'年の「'+dirName+'」の方徳（'+STAR[K.ye.star]+'が回座）：</b>'+HOUTOKU[K.ye.star].toku+'</p>';
+    }else if(K.ye.kyo.length){
+      const names=K.ye.kyo.map(k=>k==="破"?"歳破":k);
+      yearInfo='<p style="margin:6px 0 0;font-size:.86rem"><b>'+K.sy+'年の「'+dirName+'」の凶殺：</b>'+names.map(k=>'<br>【'+k+'】'+(KYOSATSU_INFO[k]||"")).join("")+'</p>';
+    }else{
+      yearInfo='<p style="margin:6px 0 0;font-size:.86rem"><b>'+K.sy+'年の「'+dirName+'」：</b>七大凶殺はありませんが、五行の相性（'+K.ye.rel+'）により凶方位です。回座星（'+STAR[K.ye.star]+'）の方災：'+HOUTOKU[K.ye.star].sai+'</p>';
+    }
+    kichiH='<div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px">'
+      +'<p style="margin:0 0 6px"><b>'+K.date+' の「'+dirName+'」の吉凶</b>　'+P.tag+'：本命星 '+STAR[P.H]+'・月命星 '+STAR[P.M]+'</p>'
+      +'<p style="margin:0;font-size:.9rem">年盤（'+K.sy+'年）：'+lab(K.ye,"歳破")+'<br>月盤：'+lab(K.me,"月破")+'<br>日盤：'+lab(K.de,"日破")+'</p>'
+      +'<p style="margin:6px 0 0"><b>三盤総合：</b>'+K.judge.rank+'</p>'
+      +'<p style="margin:4px 0 0;font-size:.9rem"><b>用途別の判断：</b>引っ越し・移転（年盤＋月盤）'+mk(K.judge.move)+'　／　旅行・お出かけ（月盤＋日盤）'+mk(K.judge.trip)+'　／　日常の外出（日盤）'+mk(K.judge.daily)+'</p>'
+      +yearInfo
+      +'<p class="hint">年盤の凶はその年を通して、月盤の凶はその月の間は引っ越し・旅行に使えません。日盤の凶はその日限りなので、大事の際は日を選び直してください。年・月は節入り（立春・各節）で切り替えて判定しています。</p></div>';
+  }else{
+    kichiH='<p class="hint" style="margin-top:10px">生年月日が未入力のため、吉方位の判定は省略しました。生年月日を入力して再度算出すると、調べる年月日の吉凶も表示されます。</p>';
+  }
+  out.innerHTML='<div class="card"><h2>方位の算出結果</h2>'
+    +'<p class="muted">起点：'+A.name+'<br>行先：'+B.name+'<br><span style="font-size:.74rem">※国土地理院の住所検索で見つかった地点です。意図した場所と一致しているか確認してください。</span></p>'
+    +'<div style="text-align:center;margin:4px 0 0"><span style="font-size:2.4rem;font-weight:bold;color:var(--accent);letter-spacing:.08em">'+dirName+'</span></div>'
+    +houiBanSVG(bearing,mode,si)
+    +'<div class="stars">'
+    +'<div class="star"><div class="lbl">方位角（'+(useMag?'磁北補正後':'真北基準')+'）</div><div class="big">'+bearing.toFixed(1)+'度</div>'
+    +(useMag?'<div class="lbl">真北基準 '+trueBearing.toFixed(1)+'度／磁気偏角 西偏 '+Math.abs(decl).toFixed(1)+'度</div>':'')+'</div>'
+    +'<div class="star"><div class="lbl">距離（大圏距離）</div><div class="big">'+dist.toFixed(1)+' km</div><div class="lbl">祐気取りでは距離が遠いほど作用が大きいとされます</div></div>'
+    +'</div>'
+    +warnH+kichiH
+    +'<p class="hint">方位の分割：'+(mode==="equal"?"45度均等の8方位":"気学式（東西南北30度・四隅60度）")+'。方位角は大圏コースの初期方位角（球面三角法）、距離はHaversine公式で算出。磁気偏角は国内主要地点テーブルからの簡易補間（精度±0.5度程度）です。</p></div>';
+  out.scrollIntoView({behavior:"smooth"});
+}
+/* 起点住所と設定の復元（localStorage）＋調べる年月日の初期化（今日） */
+function houiInit(){
+  try{
+    const f=localStorage.getItem("houi_from");if(f)document.getElementById("hsFrom").value=f;
+    const mg=localStorage.getItem("houi_mag");if(mg!==null)document.getElementById("hsMag").value=mg;
+    const dv=localStorage.getItem("houi_div");if(dv)document.getElementById("hsDiv").value=dv;
+  }catch(e){}
+  const t=new Date(),set=(id,val)=>{const e=document.getElementById(id);if(e&&!e.value)e.value=val;};
+  set("hsY",t.getFullYear());set("hsM",t.getMonth()+1);set("hsD",t.getDate());
+}
+houiInit();
+/* ===== 方位算出モジュールここまで ===== */
+
 document.querySelectorAll(".seg").forEach(seg=>seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
   seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");}));
 initTodayInputs();

@@ -178,7 +178,7 @@ section h2{font-size:.88rem;border-left:5px solid #7c5a3a;padding-left:6px;margi
   </section>
 
   <section>
-    <h2>命盤（<span id="banYearLbl">鑑定年</span>年盤・本命盤・生月命盤）</h2>
+    <h2>命盤（<span id="banYearLbl">鑑定年</span>年盤・後天定位盤・本命盤・生月命盤）</h2>
     <div class="banwrap" id="banwrap"></div>
   </section>
 
@@ -619,6 +619,7 @@ function renderBan(s,r){
   const mk=(cap,center,ha)=>'<div class="banbox">'+banSVG(center,chartStars(center),ha!=null?ha:-1,148)+'<div class="cap">'+cap+'</div></div>';
   $("banwrap").innerHTML=
     mk(toWareki(ty)+"盤（年盤）",yc,haDir)+
+    mk("後天定位盤（基本盤）",5)+
     mk("本命盤（"+STAR_SHORT[r.honmei]+"）",r.honmei)+
     mk("生月命盤（"+STAR_SHORT[r.getsumei]+"）",r.getsumei);
 }

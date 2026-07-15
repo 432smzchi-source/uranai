@@ -163,6 +163,7 @@ section h2{font-size:.88rem;border-left:5px solid #7c5a3a;padding-left:6px;margi
       </tbody>
     </table>
     <div class="note">核リズム＝十干／時空＝十二支／臓干＝蔵干（節入りからの経過日数による）。年・月は節入り切替。</div>
+    <div class="note" id="o_gogyoShugo" style="margin-top:6px;line-height:1.7">　</div>
   </section>
 
   <section style="margin:0">
@@ -177,7 +178,7 @@ section h2{font-size:.88rem;border-left:5px solid #7c5a3a;padding-left:6px;margi
   </section>
 
   <section>
-    <h2>命盤（<span id="banYearLbl">鑑定年</span>年盤・後天定位盤・本命盤・生月命盤）</h2>
+    <h2>命盤（<span id="banYearLbl">鑑定年</span>年盤・本命盤・生月命盤）</h2>
     <div class="banwrap" id="banwrap"></div>
   </section>
 
@@ -295,6 +296,25 @@ function tenchusatsuName(dStem,dBranch){const v=voidBranches(dStem,dBranch);retu
 /* 陰占の五行・干支番号・異常干支判定 */
 const ELEM_STEM=["木","木","火","火","土","土","金","金","水","水"];   // 甲乙丙丁戊己庚辛壬癸
 const ELEM_BRANCH=["水","土","木","木","土","火","火","土","金","金","土","水"]; // 子丑寅卯辰巳午未申酉戌亥
+/* ===== 全体守護神・忌神（④ uranai3.html と同一ロジック・資料「全体守護神」「忌神」PDF準拠） =====
+   陰占（日月年6文字）の五行の過不足で判定。不足(0)＝守護神／過多(3以上)は剋す・洩らす五行が守護神。
+   忌神は過多の五行そのもの＋それを生む五行（守護神と重なる五行は守護神を優先して除外）。 */
+const GOGYO=["木","火","土","金","水"];
+const GOGYO_ROLE={"木":"福・精神","火":"寿・健康","土":"禄・経済","金":"官・名誉","水":"印・知恵"};
+const G_KOKARERU={"木":"金","火":"水","土":"木","金":"火","水":"土"};/* Xを剋す五行 */
+const G_SEI={"木":"火","火":"土","土":"金","金":"水","水":"木"};/* Xが生む（洩らす先）五行 */
+const G_UMU={"木":"水","火":"木","土":"火","金":"土","水":"金"};/* Xを生む（強める）五行 */
+function zentaiShugoshin(c){const set=new Set();const why=[];
+  for(const g of GOGYO){if(c[g]===0){set.add(g);why.push(g+"性が不足");}}
+  for(const g of GOGYO){if(c[g]>=3){set.add(G_KOKARERU[g]);set.add(G_SEI[g]);why.push(g+"性が過多（剋す"+G_KOKARERU[g]+"・洩らす"+G_SEI[g]+"）");}}
+  return {list:GOGYO.filter(g=>set.has(g)),why};}
+function zentaiKishin(c,shugoList){const reason={};
+  for(const g of GOGYO){if(c[g]>=3){
+    (reason[g]=reason[g]||[]).push("過多の"+g);
+    (reason[G_UMU[g]]=reason[G_UMU[g]]||[]).push(g+"を強める");}}
+  const list=GOGYO.filter(g=>reason[g]&&!shugoList.includes(g));
+  const why=list.map(g=>g+"性（"+reason[g].join("・")+"）");
+  return {list,why};}
 const ELEM_COLOR={"木":"#3a7c5a","火":"#b04a3a","土":"#b08a3a","金":"#7a7a7a","水":"#3a6ab0"};
 const MAIN_STAR_ELEM={"貫索星":"木","石門星":"木","鳳閣星":"火","調舒星":"火","禄存星":"土","司禄星":"土","車騎星":"金","牽牛星":"金","龍高星":"水","玉堂星":"水"}; // 十大主星の五行
 const MAIN2TSU={"貫索星":"比肩","石門星":"劫財","鳳閣星":"食神","調舒星":"傷官","禄存星":"偏財","司禄星":"正財","車騎星":"偏官","牽牛星":"正官","龍高星":"偏印","玉堂星":"印綬"}; // 主星→通変星（逆引き）
@@ -433,6 +453,13 @@ function render(s,y,r){
     $(idEl).innerHTML=kanHtml(zi);$(idSub).textContent=MAIN_STAR[tsuhen(r.day.stem,zi)];};
   z(r.day,"c_dz","c_dz_s");z(r.month,"c_mz","c_mz_s");z(r.year,"c_yz","c_yz_s");
   $("c_dy").textContent=zoukanAll(r.day.branch);$("c_my").textContent=zoukanAll(r.month.branch);$("c_yy").textContent=zoukanAll(r.year.branch);
+  {const gc={"木":0,"火":0,"土":0,"金":0,"水":0};
+   for(const p of [r.year,r.month,r.day]){gc[ELEM_STEM[p.stem]]++;gc[ELEM_BRANCH[p.branch]]++;}
+   const sh=zentaiShugoshin(gc),ki=zentaiKishin(gc,sh.list);
+   $("o_gogyoShugo").innerHTML='<b>陰占五行（蔵干含まず）：</b>'
+     +GOGYO.map(g=>'<span style="color:'+ELEM_COLOR[g]+'">'+g+gc[g]+'</span>').join('・')
+     +'<br><b>全体守護神：</b>'+(sh.list.length?'<span style="color:#2a5c3a;font-weight:bold">'+sh.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>':'大きな偏りなし')
+     +'<br><b>忌神（いみがみ）：</b>'+(ki.list.length?'<span style="color:#9a5a12;font-weight:bold">'+ki.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>　<span style="color:#8a8378">※過多の五行＋それを生む五行。守護神と重なる五行は守護神を優先</span>':'過多の五行なし（特になし）');}
   const v=voidBranches(r.day.stem,r.day.branch);
   $("c_tcs").textContent=BRANCHES[v[0]]+" "+BRANCHES[v[1]];
   $("c_tcs_m").textContent=branchMonth(v[0])+"月・"+branchMonth(v[1])+"月";
@@ -585,7 +612,6 @@ function renderBan(s,r){
   const mk=(cap,center,ha)=>'<div class="banbox">'+banSVG(center,chartStars(center),ha!=null?ha:-1,148)+'<div class="cap">'+cap+'</div></div>';
   $("banwrap").innerHTML=
     mk(toWareki(ty)+"盤（年盤）",yc,haDir)+
-    mk("後天定位盤（基本盤）",5)+
     mk("本命盤（"+STAR_SHORT[r.honmei]+"）",r.honmei)+
     mk("生月命盤（"+STAR_SHORT[r.getsumei]+"）",r.getsumei);
 }

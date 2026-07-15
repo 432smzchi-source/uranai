@@ -315,6 +315,25 @@ function tenchusatsuName(dStem,dBranch){const v=voidBranches(dStem,dBranch);retu
 /* 陰占の五行・干支番号・異常干支判定 */
 const ELEM_STEM=["木","木","火","火","土","土","金","金","水","水"];   // 甲乙丙丁戊己庚辛壬癸
 const ELEM_BRANCH=["水","土","木","木","土","火","火","土","金","金","土","水"]; // 子丑寅卯辰巳午未申酉戌亥
+/* ===== 全体守護神・忌神（④ uranai3.html と同一ロジック・資料「全体守護神」「忌神」PDF準拠） =====
+   陰占（日月年6文字）の五行の過不足で判定。不足(0)＝守護神／過多(3以上)は剋す・洩らす五行が守護神。
+   忌神は過多の五行そのもの＋それを生む五行（守護神と重なる五行は守護神を優先して除外）。 */
+const GOGYO=["木","火","土","金","水"];
+const GOGYO_ROLE={"木":"福・精神","火":"寿・健康","土":"禄・経済","金":"官・名誉","水":"印・知恵"};
+const G_KOKARERU={"木":"金","火":"水","土":"木","金":"火","水":"土"};/* Xを剋す五行 */
+const G_SEI={"木":"火","火":"土","土":"金","金":"水","水":"木"};/* Xが生む（洩らす先）五行 */
+const G_UMU={"木":"水","火":"木","土":"火","金":"土","水":"金"};/* Xを生む（強める）五行 */
+function zentaiShugoshin(c){const set=new Set();const why=[];
+  for(const g of GOGYO){if(c[g]===0){set.add(g);why.push(g+"性が不足");}}
+  for(const g of GOGYO){if(c[g]>=3){set.add(G_KOKARERU[g]);set.add(G_SEI[g]);why.push(g+"性が過多（剋す"+G_KOKARERU[g]+"・洩らす"+G_SEI[g]+"）");}}
+  return {list:GOGYO.filter(g=>set.has(g)),why};}
+function zentaiKishin(c,shugoList){const reason={};
+  for(const g of GOGYO){if(c[g]>=3){
+    (reason[g]=reason[g]||[]).push("過多の"+g);
+    (reason[G_UMU[g]]=reason[G_UMU[g]]||[]).push(g+"を強める");}}
+  const list=GOGYO.filter(g=>reason[g]&&!shugoList.includes(g));
+  const why=list.map(g=>g+"性（"+reason[g].join("・")+"）");
+  return {list,why};}
 const ELEM_COLOR={"木":"#3a7c5a","火":"#b04a3a","土":"#b08a3a","金":"#7a7a7a","水":"#3a6ab0"};
 const MAIN_STAR_ELEM={"貫索星":"木","石門星":"木","鳳閣星":"火","調舒星":"火","禄存星":"土","司禄星":"土","車騎星":"金","牽牛星":"金","龍高星":"水","玉堂星":"水"}; // 十大主星の五行
 const MAIN2TSU={"貫索星":"比肩","石門星":"劫財","鳳閣星":"食神","調舒星":"傷官","禄存星":"偏財","司禄星":"正財","車騎星":"偏官","牽牛星":"正官","龍高星":"偏印","玉堂星":"印綬"}; // 主星→通変星（逆引き）
@@ -1093,6 +1112,7 @@ function run(){
   const yoZo=p=>{const list=ZOUKAN_T[BRANCHES[p.branch]].map(x=>x[1]);return list.filter(s=>s!==p.zo);};
   let gogyo={"木":0,"火":0,"土":0,"金":0,"水":0};
   yinBase.forEach(c=>{gogyo[ELEM_STEM[c[1].stem]]++;gogyo[ELEM_BRANCH[c[1].branch]]++;});
+  const _shugo=zentaiShugoshin(gogyo);const _kishin=zentaiKishin(gogyo,_shugo.list);
   let mei='<div class="card"><h2>命式（陰占）</h2><p class="muted">入力：'+r.input+' ／ 立春基準年：'+r.solarYear+'年 ／ 経過日数：'+r.keika+'日（節入りから） ／ '+(male?"男性":"女性")+'</p>'
     +'<table><tr><th>No.</th>'+yinCols.map(c=>'<th>'+c[0]+'</th>').join('')+'</tr>'
     +'<tr><td class="muted">干支番号</td>'+yinCols.map(c=>'<td>'+kanshiNo(c[1].stem,c[1].branch)+'</td>').join('')+'</tr>'
@@ -1104,6 +1124,8 @@ function run(){
     +'<tr><td class="muted">余蔵干</td>'+yinCols.map(c=>'<td style="color:#b3ab9c;font-size:.82rem">'+(yoZo(c[1]).join('・')||'—')+'</td>').join('')+'</tr></table>'
     +'<p style="margin-top:8px"><b>陰占五行（蔵干含まず）：</b> '
     +'<span style="color:#3a7c5a">木'+gogyo["木"]+'</span>　<span style="color:#b04a3a">火'+gogyo["火"]+'</span>　<span style="color:#b08a3a">土'+gogyo["土"]+'</span>　<span style="color:#7a7a7a">金'+gogyo["金"]+'</span>　<span style="color:#3a6ab0">水'+gogyo["水"]+'</span></p>'
+    +'<p style="margin-top:4px"><b>全体守護神：</b> '+(_shugo.list.length?'<span style="color:#2a5c3a;font-weight:bold">'+_shugo.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>　<span class="muted" style="font-size:.8rem">※'+_shugo.why.join('／')+'。この五行を生活に取り入れると心のバランスを保ちやすい</span>':'大きな偏りなし')+'</p>'
+    +'<p style="margin-top:4px"><b>忌神（いみがみ）：</b> '+(_kishin.list.length?'<span style="color:#9a5a12;font-weight:bold">'+_kishin.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>　<span class="muted" style="font-size:.8rem">※'+_kishin.why.join('／')+'。この五行が大運・年運で巡る時期は過剰・空回り・頑固さに注意（守護神と重なる五行は守護神を優先）</span>':'過多の五行なし（特になし）')+'</p>'
     +'<p style="margin-top:4px"><b>位相法：</b> '+isouhou(r)+'</p>'
     +'<p style="margin-top:4px"><b>十二支の刑冲破害：</b> '+juunishiKankei(r)+'</p>'
     +'<div style="margin-top:6px"><b style="font-size:.9rem">命式図（線で結ぶ）</b><div style="font-size:.74rem;margin-top:2px"><span style="color:#3a6ab0">━干合</span>　<span style="color:#3a7c5a">━三合</span>　<span style="color:#2a9d8f">━合</span>　<span style="color:#7a3aa0">━刑</span>　<span style="color:#c0392b">━冲</span>　<span style="color:#d98a2b">━破</span>　<span style="color:#b03a7a">━害</span></div>'+meishikiLines(r)+'</div>'

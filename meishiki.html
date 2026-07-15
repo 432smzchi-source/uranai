@@ -162,7 +162,7 @@ section h2{font-size:.88rem;border-left:5px solid #7c5a3a;padding-left:6px;margi
           <td colspan="3" id="c_chusatsu" style="font-size:.82rem;text-align:left;padding-left:8px">　</td></tr>
       </tbody>
     </table>
-    <div class="note">核リズム＝十干／時空＝十二支／臓干＝蔵干（節入りからの経過日数による）。年・月は節入り切替。</div>
+    <div class="note">核リズム＝十干／時空＝十二支／臓干＝蔵干（節入りからの経過日数による）。年・月は節入り切替。<span style="color:#d2342f">赤字の干支</span>＝命式（年月日柱）が異常干支。</div>
     <div class="note" id="o_gogyoShugo" style="margin-top:6px;line-height:1.7">　</div>
   </section>
 
@@ -294,6 +294,11 @@ function compute(y,m,d,hh,mm,male){const di=dayIdx(y,m,d);const mb=monthBranchAn
 function voidBranches(dStem,dBranch){const head=((dBranch-dStem)%12+12)%12;return [(head+10)%12,(head+11)%12];}
 function tenchusatsuName(dStem,dBranch){const v=voidBranches(dStem,dBranch);return BRANCHES[v[0]]+BRANCHES[v[1]]+"天中殺";}
 /* 陰占の五行・干支番号・異常干支判定 */
+/* ===== 異常干支（①占いアプリ.html と同一定義・基礎からわかる算命学準拠） =====
+   通常異常干支6種＋暗合異常干支7種。命式（年月日柱）の干支がこれに該当すれば赤字で表示。 */
+const JOJO_NORMAL={"甲戌":"独身・子のない家庭・海外などでは個性（異常性）が穏やかに出る。","乙亥":"独身だと個性が表に出にくい。","戊戌":"天才肌で教養が高い。学びを深め早く社会に出ると安定。","庚子":"過保護を避け、大家族や集団で健やかに育つとよい。健康面に留意。","辛亥":"身体・ケガに注意。整形手術などは慎重に。","丁巳":"一代として栄え、経済力に恵まれやすい。"};
+const JOJO_ANGO={"辛巳":"育つ環境で個性の出方が変わる。霊感が強い。","壬午":"霊感の素質があり、予知的な勘に恵まれる。","丙戌":"早く社会に出て技を磨くと安定。結婚は慎重に。","丁亥":"霊感が高く、勘や予知に優れる。","戊子":"平均的な環境だと気まぐれ・独自性が強まりやすい。","癸巳":"本人より配偶者・周囲に影響（異常性）が出やすい。","己亥":"器用で霊感的な体質。視力・目に留意。"};
+function isIjoKanshi(k){return !!(JOJO_NORMAL[k]||JOJO_ANGO[k]);}
 const ELEM_STEM=["木","木","火","火","土","土","金","金","水","水"];   // 甲乙丙丁戊己庚辛壬癸
 const ELEM_BRANCH=["水","土","木","木","土","火","火","土","金","金","土","水"]; // 子丑寅卯辰巳午未申酉戌亥
 /* ===== 全体守護神・忌神（④ uranai3.html と同一ロジック・資料「全体守護神」「忌神」PDF準拠） =====
@@ -443,12 +448,14 @@ function render(s,y,r){
   $("o_daikichi").textContent=daikichi(r.honmei);
   $("o_tcs_head").textContent=tenchusatsuName(r.day.stem,r.day.branch);
   $("h_day").textContent=s.bd+"日";$("h_month").textContent=s.bm+"月";$("h_year").textContent=toWareki(y)+"（"+y+"）";
-  $("c_ds").innerHTML=kanHtml(r.day.stem);
-  $("c_ms").innerHTML=kanHtml(r.month.stem);$("c_ms_s").textContent=MAIN_STAR[r.month.tsu];
-  $("c_ys").innerHTML=kanHtml(r.year.stem);$("c_ys_s").textContent=MAIN_STAR[r.year.tsu];
-  $("c_db").innerHTML=branchHtml(r.day.branch);$("c_db_s").textContent=SUB_STAR[r.day.un];
-  $("c_mb").innerHTML=branchHtml(r.month.branch);$("c_mb_s").textContent=SUB_STAR[r.month.un];
-  $("c_yb").innerHTML=branchHtml(r.year.branch);$("c_yb_s").textContent=SUB_STAR[r.year.un];
+  /* 命式（年月日柱）の干支が異常干支なら、その柱の干・支を赤字で表示 */
+  const ijoW=(html,p)=>isIjoKanshi(p.k)?'<span style="color:#d2342f">'+html+'</span>':html;
+  $("c_ds").innerHTML=ijoW(kanHtml(r.day.stem),r.day);
+  $("c_ms").innerHTML=ijoW(kanHtml(r.month.stem),r.month);$("c_ms_s").textContent=MAIN_STAR[r.month.tsu];
+  $("c_ys").innerHTML=ijoW(kanHtml(r.year.stem),r.year);$("c_ys_s").textContent=MAIN_STAR[r.year.tsu];
+  $("c_db").innerHTML=ijoW(branchHtml(r.day.branch),r.day);$("c_db_s").textContent=SUB_STAR[r.day.un];
+  $("c_mb").innerHTML=ijoW(branchHtml(r.month.branch),r.month);$("c_mb_s").textContent=SUB_STAR[r.month.un];
+  $("c_yb").innerHTML=ijoW(branchHtml(r.year.branch),r.year);$("c_yb_s").textContent=SUB_STAR[r.year.un];
   const z=(p,idEl,idSub)=>{const zi=STEMS.indexOf(zoukanByDay(BRANCHES[p.branch],r.keika));
     $(idEl).innerHTML=kanHtml(zi);$(idSub).textContent=MAIN_STAR[tsuhen(r.day.stem,zi)];};
   z(r.day,"c_dz","c_dz_s");z(r.month,"c_mz","c_mz_s");z(r.year,"c_yz","c_yz_s");

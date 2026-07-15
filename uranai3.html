@@ -110,7 +110,7 @@ section h2{font-size:.88rem;border-left:5px solid var(--head);padding-left:6px;m
   <section>
     <h2>運の流れ図（<span id="chartLbl">　</span>）</h2>
     <div id="chartwrap"></div>
-    <div class="note">右から 年柱・月柱・日柱・大運・鑑定年の3年前〜鑑定年＋4年（計8年分）。緑背景＝鑑定年。赤丸＝空亡（天中殺）の支。線＝位相法（下段）と干合（上段）。大運との線は、表示中の大運の年齢範囲内の年のみ。</div>
+    <div class="note">右から 年柱・月柱・日柱・大運・鑑定年の3年前〜鑑定年＋4年（計8年分）。緑背景＝鑑定年。赤丸＝空亡（天中殺）の支。<span style="color:#d2342f">赤字の干支</span>＝命式（年月日柱）が異常干支。線＝位相法（下段）と干合（上段）。大運との線は、表示中の大運の年齢範囲内の年のみ。</div>
   </section>
 
   <section>
@@ -243,6 +243,11 @@ function autoTy(){const d=new Date();
    不足(0個)の五行＝守護神／過多(3個以上)の五行＝剋す・洩らす五行が守護神 */
 const ELEM_STEM=["木","木","火","火","土","土","金","金","水","水"];
 const ELEM_BRANCH=["水","土","木","木","土","火","火","土","金","金","土","水"];
+/* ===== 異常干支（①占いアプリ.html と同一定義・基礎からわかる算命学準拠） =====
+   通常異常干支6種＋暗合異常干支7種。命式（年月日柱）の干支がこれに該当すれば赤字で表示。 */
+const JOJO_NORMAL={"甲戌":"独身・子のない家庭・海外などでは個性（異常性）が穏やかに出る。","乙亥":"独身だと個性が表に出にくい。","戊戌":"天才肌で教養が高い。学びを深め早く社会に出ると安定。","庚子":"過保護を避け、大家族や集団で健やかに育つとよい。健康面に留意。","辛亥":"身体・ケガに注意。整形手術などは慎重に。","丁巳":"一代として栄え、経済力に恵まれやすい。"};
+const JOJO_ANGO={"辛巳":"育つ環境で個性の出方が変わる。霊感が強い。","壬午":"霊感の素質があり、予知的な勘に恵まれる。","丙戌":"早く社会に出て技を磨くと安定。結婚は慎重に。","丁亥":"霊感が高く、勘や予知に優れる。","戊子":"平均的な環境だと気まぐれ・独自性が強まりやすい。","癸巳":"本人より配偶者・周囲に影響（異常性）が出やすい。","己亥":"器用で霊感的な体質。視力・目に留意。"};
+function isIjoKanshi(k){return !!(JOJO_NORMAL[k]||JOJO_ANGO[k]);}
 const GOGYO=["木","火","土","金","水"];
 const GOGYO_ROLE={"木":"福・精神","火":"寿・健康","土":"禄・経済","金":"官・名誉","水":"印・知恵"};
 const G_KOKARERU={"木":"金","火":"水","土":"木","金":"火","水":"土"};/* Xを剋す五行 */
@@ -406,12 +411,15 @@ function flowSVG(F,r,ty){
     if(h2)g+='<text x="'+x+'" y="'+hy2+'" text-anchor="middle" font-size="10" fill="#888">'+h2+'</text>';
     if(h3)g+='<text x="'+x+'" y="'+hy3+'" text-anchor="middle" font-size="10" fill="#888">'+h3+'</text>';
     /* 干 */
+    /* 命式（年月日柱）の干支が異常干支なら干・支を赤字に */
+    const ijoCol=c.type==="pillar"&&isIjoKanshi(kanshi(combine(c.stem,c.branch)));
+    const ijoFill=ijoCol?'#d2342f':'#2b2b2b';
     g+='<rect x="'+(x-box/2)+'" y="'+kanTop+'" width="'+box+'" height="'+box+'" rx="6" fill="#fff" stroke="#8a7a5a"/>'
-      +'<text x="'+x+'" y="'+(kanTop+25)+'" text-anchor="middle" font-size="20" font-weight="bold" fill="#2b2b2b">'+STEMS[c.stem]+'</text>';
+      +'<text x="'+x+'" y="'+(kanTop+25)+'" text-anchor="middle" font-size="20" font-weight="bold" fill="'+ijoFill+'">'+STEMS[c.stem]+'</text>';
     /* 支（空亡は赤丸） */
     const isVoid=F.v.includes(c.branch);
     g+='<rect x="'+(x-box/2)+'" y="'+shiTop+'" width="'+box+'" height="'+box+'" rx="6" fill="#fff" stroke="#8a7a5a"/>'
-      +'<text x="'+x+'" y="'+(shiTop+25)+'" text-anchor="middle" font-size="20" font-weight="bold" fill="#2b2b2b">'+BRANCHES[c.branch]+'</text>';
+      +'<text x="'+x+'" y="'+(shiTop+25)+'" text-anchor="middle" font-size="20" font-weight="bold" fill="'+ijoFill+'">'+BRANCHES[c.branch]+'</text>';
     if(isVoid){g+='<circle cx="'+x+'" cy="'+(shiTop+16)+'" r="15" fill="none" stroke="#c0392b" stroke-width="1.8"/>'
       +'<text x="'+x+'" y="'+voidLblY+'" text-anchor="middle" font-size="9" fill="#c0392b" font-weight="bold" style="paint-order:stroke;stroke:#fff;stroke-width:3">'+(c.type==="daiun"?"大運天中殺":"空亡")+'</text>';}
     else if(c.type==="year"&&c.shugo)g+='<text x="'+x+'" y="'+voidLblY+'" text-anchor="middle" font-size="9" fill="#2a5c3a" font-weight="bold" style="paint-order:stroke;stroke:#fff;stroke-width:3">守護神</text>';

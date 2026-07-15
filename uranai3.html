@@ -53,6 +53,7 @@ section h2{font-size:.88rem;border-left:5px solid var(--head);padding-left:6px;m
 .tag{display:inline-block;font-size:.66rem;border-radius:6px;padding:0 6px;margin-left:4px;vertical-align:1px;}
 .tag.red{background:#f5d8da;color:#9c3b44;}
 .tag.grn{background:#dcecdc;color:#2a5c3a;}
+.tag.org{background:#f6e2c8;color:#9a5a12;}
 #chartwrap{overflow-x:auto;background:#fff;border:1px solid var(--line);}
 @media (max-width:800px){
   #sheet{width:100%;margin:8px 0;padding:4mm 3mm;box-shadow:none;}
@@ -103,6 +104,7 @@ section h2{font-size:.88rem;border-left:5px solid var(--head);padding-left:6px;m
     <tr><td class="lbl">命 式</td><td class="val" id="o_meishiki">　</td><td class="lbl">天中殺</td><td class="val" id="o_tcs">　</td></tr>
     <tr><td class="lbl">大 運</td><td class="val" id="o_daiun">　</td><td class="lbl">鑑定年の年齢</td><td class="val" id="o_age">　</td></tr>
     <tr><td class="lbl">五行バランス</td><td class="val" id="o_gogyo">　</td><td class="lbl">全体守護神</td><td class="val" id="o_shugo">　</td></tr>
+    <tr><td class="lbl">忌 神</td><td class="val" id="o_kishin" colspan="3">　</td></tr>
   </table>
 
   <section>
@@ -135,7 +137,8 @@ section h2{font-size:.88rem;border-left:5px solid var(--head);padding-left:6px;m
       <b>対冲</b>…正面衝突・変動・移動（凶）　<b>刑</b>…内側からの摩擦・もめごと（凶）　<b>自刑</b>…自分自身を痛めやすい（凶）<br>
       <b>害</b>…身近な妨害・足の引っぱり（凶）　<b>破</b>…破れ・小さな崩れ・計画変更（小凶）　<b>干合</b>…天干の結び付き。心が引かれる・変化の誘い<br>
       <b>空亡の年（天中殺）</b>…運気が不安定になりやすく、新しいことは控えめが無難。<br>
-      <b>全体守護神</b>…陰占（日月年の6文字）の五行の過不足から見た、心のバランスを保つ五行。不足する五行＝守護神／多すぎる五行は「剋す」「洩らす」五行が守護神。年干がその五行に当たる年に緑の「守護神」印を表示。
+      <b>全体守護神</b>…陰占（日月年の6文字）の五行の過不足から見た、心のバランスを保つ五行。不足する五行＝守護神／多すぎる五行は「剋す」「洩らす」五行が守護神。年干がその五行に当たる年に緑の「守護神」印を表示。<br>
+      <b>忌神（いみがみ）</b>…守護神の裏返し。多すぎる（過多）五行そのものと、それを更に強める（生む）五行。すでに溢れているエネルギーを増やしてバランスを崩す五行で、「悪い神」ではなく“やり過ぎ・過剰”のサイン。この五行が巡る時期は現状維持・受け身が吉。年干がこの五行に当たる年に橙の「忌神」印を表示（守護神と重なる五行は守護神を優先）。
     </div>
   </section>
 
@@ -251,6 +254,17 @@ function zentaiShugoshin(c){const set=new Set();const why=[];
   for(const g of GOGYO){if(c[g]===0){set.add(g);why.push(g+"性が不足");}}
   for(const g of GOGYO){if(c[g]>=3){set.add(G_KOKARERU[g]);set.add(G_SEI[g]);why.push(g+"性が過多（剋す"+G_KOKARERU[g]+"・洩らす"+G_SEI[g]+"）");}}
   return {list:GOGYO.filter(g=>set.has(g)),why};}
+/* ===== 忌神（いみがみ）＝守護神の対称（資料「忌神」PDF準拠・抑扶の五行法） =====
+   過多(3個以上)の五行そのもの＝これ以上巡るとバランスを崩す忌神。
+   さらにその五行を「生む（強める）」五行も忌神。ただし守護神（不足で必要な五行）は除外。 */
+const G_UMU={"木":"水","火":"木","土":"火","金":"土","水":"金"};/* Xを生む（強める）五行 */
+function zentaiKishin(c,shugoList){const reason={};
+  for(const g of GOGYO){if(c[g]>=3){
+    (reason[g]=reason[g]||[]).push("過多の"+g);
+    (reason[G_UMU[g]]=reason[G_UMU[g]]||[]).push(g+"を強める");}}
+  const list=GOGYO.filter(g=>reason[g]&&!shugoList.includes(g));
+  const why=list.map(g=>g+"性（"+reason[g].join("・")+"）");
+  return {list,why};}
 
 /* ===== 位相法（既存アプリの表を流用し、干支ペア判定に拡張） ===== */
 const PH_SHIGOU=[[0,1],[2,11],[3,10],[4,9],[5,8],[6,7]];
@@ -309,6 +323,7 @@ function flowData(r,birthAD,s,ty){
   const du=daiunAt(age);
   const gc=gogyoCount(r);
   const shugo=zentaiShugoshin(gc);
+  const kishin=zentaiKishin(gc,shugo.list);
   const pillars=[
     {key:"year",lbl:"年",stem:r.year.stem,branch:r.year.branch},
     {key:"month",lbl:"月",stem:r.month.stem,branch:r.month.branch},
@@ -322,7 +337,8 @@ function flowData(r,birthAD,s,ty){
       stem:yi%10,branch:yi%12,
       main:MAIN_STAR[tsuhen(ds,yi%10)],sub:SUB_STAR[juniun(ds,yi%12)],
       tcs:v.includes(yi%12),
-      shugo:shugo.list.includes(ELEM_STEM[yi%10])});}
+      shugo:shugo.list.includes(ELEM_STEM[yi%10]),
+      kishin:kishin.list.includes(ELEM_STEM[yi%10])});}
   /* 位相法：命式内部・大運vs命式・各年vs命式＋大運 */
   const rels=[];
   const addRels=(a,b)=>{const rs=pairRels(a.stem,a.branch,b.stem,b.branch);
@@ -331,7 +347,7 @@ function flowData(r,birthAD,s,ty){
   for(const p of pillars)addRels(duCol,p);
   for(const yc of years){for(const p of pillars)addRels(yc,p);
     if(yc.age>=du.from&&yc.age<=du.to)addRels(yc,duCol);/* 大運との位相法は、その大運の年齢範囲内の年のみ */}
-  return {v,k0,days,age,du,duCol,pillars,years,rels,daiunAt,gc,shugo};}
+  return {v,k0,days,age,du,duCol,pillars,years,rels,daiunAt,gc,shugo,kishin};}
 
 /* ===== 図（SVG） ===== */
 const RELCOL={"支合":"#2a9d8f","半会":"#3a7c5a","大半会":"#1f6b3a","対冲":"#c0392b","刑":"#7a3aa0","自刑":"#7a3aa0","害":"#b03a7a","破":"#d98a2b","干合":"#3a6ab0","納音":"#2a6f8f","律音":"#6b4fa0"};
@@ -399,6 +415,7 @@ function flowSVG(F,r,ty){
     if(isVoid){g+='<circle cx="'+x+'" cy="'+(shiTop+16)+'" r="15" fill="none" stroke="#c0392b" stroke-width="1.8"/>'
       +'<text x="'+x+'" y="'+voidLblY+'" text-anchor="middle" font-size="9" fill="#c0392b" font-weight="bold" style="paint-order:stroke;stroke:#fff;stroke-width:3">'+(c.type==="daiun"?"大運天中殺":"空亡")+'</text>';}
     else if(c.type==="year"&&c.shugo)g+='<text x="'+x+'" y="'+voidLblY+'" text-anchor="middle" font-size="9" fill="#2a5c3a" font-weight="bold" style="paint-order:stroke;stroke:#fff;stroke-width:3">守護神</text>';
+    else if(c.type==="year"&&c.kishin)g+='<text x="'+x+'" y="'+voidLblY+'" text-anchor="middle" font-size="9" fill="#9a5a12" font-weight="bold" style="paint-order:stroke;stroke:#fff;stroke-width:3">忌神</text>';
     /* 星（大運・年運）：ボックスの右横 */
     if(c.main)g+='<text x="'+(x+box/2+3)+'" y="'+(kanTop+14)+'" font-size="9" fill="#31427c">'+c.main[0]+'</text>'
       +'<text x="'+(x+box/2+3)+'" y="'+(shiTop+14)+'" font-size="9" fill="#b04a3a">'+c.sub[1]+'</text>';
@@ -422,6 +439,10 @@ function buildComment(F,r,ty){
     lines.push("五行バランスは "+GOGYO.map(g=>g+F.gc[g]).join("・")+"。全体守護神は "
       +F.shugo.list.map(g=>g+"（"+GOGYO_ROLE[g]+"）").join("・")+"（"+F.shugo.why.join("／")+"）。"
       +"この五行を日頃の生活に取り入れると心のバランスを保ちやすくなります。");
+  if(F.kishin.list.length)
+    lines.push("忌神（いみがみ）は "
+      +F.kishin.list.map(g=>g+"（"+GOGYO_ROLE[g]+"）").join("・")+"（"+F.kishin.why.join("／")+"）。"
+      +"この五行が大運・年運で巡る時期は、過剰・空回り・頑固さが出やすく、拡大より現状維持・内面を磨く受け身の姿勢が吉。年干がこの五行に当たる年に橙の「忌神」印を表示します。");
   for(const yc of F.years){
     const rs=relsOfYear(F,yc);
     const kichi=rs.filter(x=>KICHI_RELS.includes(x.name)||x.name==="干合");
@@ -431,6 +452,7 @@ function buildComment(F,r,ty){
     const parts=[];
     if(yc.tcs)parts.push("【空亡の年（天中殺）】新しい事や大きな決断は控えめに");
     if(yc.shugo)parts.push("年干"+STEMS[yc.stem]+"が全体守護神の五行（"+ELEM_STEM[yc.stem]+"）に当たり、支えを得やすい年");
+    if(yc.kishin)parts.push("年干"+STEMS[yc.stem]+"が忌神の五行（"+ELEM_STEM[yc.stem]+"）に当たり、無理な拡大を避け受け身で過ごすと安定しやすい年");
     if(kyo.length)parts.push(kyo.map(x=>PILLAR_LBL[x.target]+"と"+x.name).join("・")+"があり、変動・摩擦が出やすい");
     if(kichi.length)parts.push(kichi.map(x=>PILLAR_LBL[x.target]+"と"+x.name).join("・")+"で、縁や協力がまとまりやすい");
     if(other.length)parts.push(other.map(x=>PILLAR_LBL[x.target]+"と"+relDisp(x.name)).join("・")+"（変化・再スタートの気運）");
@@ -484,12 +506,15 @@ function render(s,y,r,ty,F){
   $("o_shugo").textContent=F.shugo.list.length
     ?F.shugo.list.map(g=>g+"（"+GOGYO_ROLE[g]+"）").join("・")+"　※"+F.shugo.why.join("／")
     :"大きな偏りなし";
+  $("o_kishin").textContent=F.kishin.list.length
+    ?F.kishin.list.map(g=>g+"（"+GOGYO_ROLE[g]+"）").join("・")+"　※"+F.kishin.why.join("／")
+    :"過多の五行なし（特になし）";
   $("chartLbl").textContent=toWareki(ty-3)+"（"+(ty-3)+"）〜"+toWareki(ty+4)+"（"+(ty+4)+"）・鑑定年 "+ty;
   $("chartwrap").innerHTML=flowSVG(F,r,ty);
   /* 一覧表 */
   let h='<tr><th style="width:7em">年</th><th style="width:4.5em">干支</th><th style="width:3.5em">年齢</th><th style="width:7em">年運の星</th><th>命式・大運との位相法</th><th style="width:5em">印</th></tr>';
   for(const yc of F.years){
-    const tags=(yc.tcs?'<span class="tag red">空亡</span>':'')+(yc.shugo?'<span class="tag grn">守護神</span>':'');
+    const tags=(yc.tcs?'<span class="tag red">空亡</span>':'')+(yc.shugo?'<span class="tag grn">守護神</span>':'')+(yc.kishin?'<span class="tag org">忌神</span>':'');
     h+='<tr'+(yc.tcs?' class="void"':'')+'><td>'+yc.y+'年（'+yc.wareki+'）</td>'
       +'<td class="kanji" style="font-weight:bold">'+kanshi(combine(yc.stem,yc.branch))+'</td>'
       +'<td>'+yc.age+'才</td>'

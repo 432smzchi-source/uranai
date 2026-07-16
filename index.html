@@ -315,6 +315,29 @@ function tenchusatsuName(dStem,dBranch){const v=voidBranches(dStem,dBranch);retu
 /* 陰占の五行・干支番号・異常干支判定 */
 const ELEM_STEM=["木","木","火","火","土","土","金","金","水","水"];   // 甲乙丙丁戊己庚辛壬癸
 const ELEM_BRANCH=["水","土","木","木","土","火","火","土","金","金","土","水"]; // 子丑寅卯辰巳午未申酉戌亥
+/* ===== 調候守護神（日干×月支 120通り表・先生の流派準拠） =====
+   行=日干(0-9=甲乙丙丁戊己庚辛壬癸) 列=月支index(寅=0...丑=11) */
+const CHOKO_TABLE=[
+/* 甲 */["丙,癸","庚,戊,丁","庚,丁,壬","癸,庚,丁","癸,庚,丁","癸,庚,丁","庚,丁,壬","庚,丁,丙","庚,甲,丁","庚,丁,丙","丁,庚,丙","庚,丁,丙"],
+/* 乙 */["丙,癸","丙,癸","癸,丙,戊","癸,辛","癸,丙","癸,丙","丙,癸,己","丙,癸","癸,辛","丙,戊,丁","丙,戊,丁","丙,戊,丁"],
+/* 丙 */["壬,庚","壬,己","壬,甲","壬,庚","壬,庚","壬,庚","壬,戊","壬,癸","甲,壬","甲,戊,庚","壬,戊,己","壬,甲"],
+/* 丁 */["甲,庚","庚,甲","甲,庚","甲,庚","甲,庚","甲,壬,庚","甲,庚","甲,庚,丙","甲,庚,戊","甲,庚","甲,庚","甲,庚"],
+/* 戊 */["丙,甲,癸","丙,甲,癸","甲,丙,癸","甲,丙","壬,甲,丙","癸,丙,甲","丙,癸,甲","丙,癸","甲,丙,癸","甲,丙","丙,甲","甲,丙"],
+/* 己 */["丙,甲,癸","甲,丙,癸","丙,甲,癸","癸,丙","癸,丙","癸,丙","丙,癸","丙,癸","甲,丙,癸","丙,甲,戊","丙,甲,戊","丙,甲,戊"],
+/* 庚 */["戊,甲,壬","丁,甲,庚","甲,丁,壬","壬,丙,戊","壬,癸","丁,甲","丁,甲","丁,甲,丙","甲,壬","丁,丙","丁,丙,甲","丁,丙,甲"],
+/* 辛 */["己,壬,庚","壬,甲","壬,甲","壬,甲,癸","壬,己,癸","壬,庚","壬,甲","壬,甲","壬,甲","壬,丙,戊","丙,壬,戊","丙,壬,戊"],
+/* 壬 */["庚,丙,戊","戊,辛,庚","甲,庚","壬,辛","癸,辛","辛,甲","戊,丁","甲,庚","甲,戊","戊,丙,庚","戊,丙","丙,丁,甲"],
+/* 癸 */["辛,丙","庚,辛","丙,辛,甲","辛,庚","庚,辛,壬","庚,辛,壬","丁,庚","辛,丙","辛,甲,壬","庚,辛,戊","丙,辛","丙,丁"]
+];
+const BRANCH_CHOKO_IDX={2:0,3:1,4:2,5:3,6:4,7:5,8:6,9:7,10:8,11:9,0:10,1:11};
+const STEMS10=["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
+const BRANCHES12=["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+function chokoShugoshin(stem,branch){
+  const row=CHOKO_TABLE[stem];const col=BRANCH_CHOKO_IDX[branch];
+  if(row===undefined||col===undefined)return{first:"",list:[]};
+  const vals=row[col].split(",").map(v=>v.trim()).filter(Boolean);
+  return{first:vals[0]||"",list:vals};}
+
 /* ===== 全体守護神・忌神（④ uranai3.html と同一ロジック・資料「全体守護神」「忌神」PDF準拠） =====
    陰占（日月年6文字）の五行の過不足で判定。不足(0)＝守護神／過多(3以上)は剋す・洩らす五行が守護神。
    忌神は過多の五行そのもの＋それを生む五行（守護神と重なる五行は守護神を優先して除外）。 */
@@ -1126,6 +1149,7 @@ function run(){
     +'<span style="color:#3a7c5a">木'+gogyo["木"]+'</span>　<span style="color:#b04a3a">火'+gogyo["火"]+'</span>　<span style="color:#b08a3a">土'+gogyo["土"]+'</span>　<span style="color:#7a7a7a">金'+gogyo["金"]+'</span>　<span style="color:#3a6ab0">水'+gogyo["水"]+'</span></p>'
     +'<p style="margin-top:4px"><b>全体守護神：</b> '+(_shugo.list.length?'<span style="color:#2a5c3a;font-weight:bold">'+_shugo.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>　<span class="muted" style="font-size:.8rem">※'+_shugo.why.join('／')+'。この五行を生活に取り入れると心のバランスを保ちやすい</span>':'大きな偏りなし')+'</p>'
     +'<p style="margin-top:4px"><b>忌神（いみがみ）：</b> '+(_kishin.list.length?'<span style="color:#9a5a12;font-weight:bold">'+_kishin.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>　<span class="muted" style="font-size:.8rem">※'+_kishin.why.join('／')+'。この五行が大運・年運で巡る時期は過剰・空回り・頑固さに注意（守護神と重なる五行は守護神を優先）</span>':'過多の五行なし（特になし）')+'</p>'
+    +(()=>{const ck=chokoShugoshin(r.day.stem,r.month.branch);return '<p style="margin-top:4px"><b>調候守護神：</b> '+'<span style="color:#1a5c8a;font-weight:bold">第一：'+ck.first+'　全：'+ck.list.join('・')+'</span>'+'<span class="muted" style="font-size:.8rem">　（日干'+STEMS10[r.day.stem]+'×'+BRANCHES12[r.month.branch]+'月）</span></p>';})()
     +'<p style="margin-top:4px"><b>位相法：</b> '+isouhou(r)+'</p>'
     +'<p style="margin-top:4px"><b>十二支の刑冲破害：</b> '+juunishiKankei(r)+'</p>'
     +'<div style="margin-top:6px"><b style="font-size:.9rem">命式図（線で結ぶ）</b><div style="font-size:.74rem;margin-top:2px"><span style="color:#3a6ab0">━干合</span>　<span style="color:#3a7c5a">━三合</span>　<span style="color:#2a9d8f">━合</span>　<span style="color:#7a3aa0">━刑</span>　<span style="color:#c0392b">━冲</span>　<span style="color:#d98a2b">━破</span>　<span style="color:#b03a7a">━害</span></div>'+meishikiLines(r)+'</div>'

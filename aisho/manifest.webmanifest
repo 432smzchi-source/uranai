@@ -1,0 +1,17 @@
+{
+  "name": "相性チェックメモ",
+  "short_name": "相性メモ",
+  "description": "算命学・九星気学の考え方による、二人の相性メモ作成ツール（個人学習用）",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e8e4da",
+  "theme_color": "#7c5a3a",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

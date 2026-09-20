@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="算命学・九星気学の考え方を使った、二人の相性メモ作成ツール（個人学習用）。判定の導出過程と典拠を併記します。">
+<title>相性チェックメモ</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#7c5a3a">
+<link rel="icon" href="./icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="相性メモ">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<style>
+:root{--ink:#2b2b2b;--line:#555;--accent:#b04a3a;--paper:#fdfcf8;--muted:#8a8276;--soft:#cfc8b8;}
+*{box-sizing:border-box;}
+body{margin:0;background:#e8e4da;font-family:"Hiragino Mincho ProN","Yu Mincho","BIZ UDMincho",serif;color:var(--ink);
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  -webkit-text-size-adjust:100%;}
+#panel{background:#f4f1e8;border-bottom:2px solid var(--soft);padding:14px 16px;font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;}
+#btnInstall{display:none;background:#fff;color:#5a4a2a;}
+#panel h1{font-size:1.1rem;margin:0 0 10px;}
+.persons{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.pbox{background:#fff;border:1px solid #d8d2c2;border-radius:8px;padding:10px 12px;}
+.pbox h3{margin:0 0 8px;font-size:.9rem;color:#5a4a2a;}
+.frow{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:6px;}
+.fld{display:flex;flex-direction:column;gap:2px;}
+.fld label{font-size:.66rem;color:#6b6355;}
+.fld input,.fld select{font-size:.92rem;padding:4px 6px;border:1px solid #bbb;border-radius:5px;background:#fff;}
+.fld input[type=number]{width:64px;}
+.fld input[type=text]{width:120px;}
+button{font-size:.88rem;padding:8px 18px;border:1px solid #8a7a5a;border-radius:6px;background:#7c5a3a;color:#fff;cursor:pointer;font-family:inherit;}
+button:hover{opacity:.85;}
+#actrow{margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+#msg{font-size:.75rem;color:var(--accent);}
+
+#sheet{width:210mm;max-width:100%;margin:16px auto;background:var(--paper);box-shadow:0 2px 12px rgba(0,0,0,.25);padding:9mm 8mm;display:none;}
+#sheet h2{font-size:1.32rem;text-align:center;margin:0 0 6mm;letter-spacing:.05em;}
+section{margin-bottom:7mm;}
+section h3{font-size:.95rem;border-left:5px solid #7c5a3a;padding-left:6px;margin:0 0 3mm;font-family:sans-serif;}
+
+table.basej{width:100%;border-collapse:collapse;font-size:.84rem;}
+table.basej th,table.basej td{border:1px solid var(--line);padding:4px 6px;text-align:center;}
+table.basej thead th{background:#f3efe4;font-weight:normal;font-size:.72rem;}
+table.basej tbody th{background:#f7f4ea;font-weight:normal;}
+.no{font-size:.66rem;color:var(--muted);margin-left:3px;}
+.gogyo{display:inline-block;font-size:.62rem;border:1px solid currentColor;border-radius:4px;padding:0 3px;margin-left:3px;vertical-align:2px;}
+.gk{color:#3a7c5a;}.gh{color:#b04a3a;}.gd{color:#b08a3a;}.gki{color:#7a7a7a;}.gs{color:#3a6ab0;}
+
+.summary{background:#fff;border:2px solid #7c5a3a;border-radius:8px;padding:9px 13px;margin-bottom:7mm;}
+.summary h4{margin:0 0 2mm;font-size:.9rem;font-family:sans-serif;}
+.summary h4+ul{margin-bottom:3mm;}
+ul.pts{margin:0;padding-left:1.3em;font-size:.85rem;line-height:1.65;}
+ul.pts li{margin-bottom:1.5mm;}
+
+.verdict{background:#fbf6ec;border:1px solid #e3dcc8;border-radius:6px;padding:7px 11px;font-size:.86rem;line-height:1.7;}
+.vlead{font-size:.92rem;margin-bottom:2mm;}
+.vrow{margin-top:1.5mm;}
+.vlbl{display:inline-block;font-size:.68rem;font-family:sans-serif;background:#efe9db;border:1px solid var(--soft);border-radius:3px;padding:0 5px;margin-right:5px;color:#5a4a2a;vertical-align:1px;white-space:nowrap;}
+.vcau .vlbl{background:#f6e4e1;border-color:#e0c4bf;color:#8a3a2a;}
+.vtip .vlbl{background:#e4efe7;border-color:#c2d8c8;color:#2a6a44;}
+
+.ev{border:1px dashed var(--soft);border-radius:6px;padding:6px 11px 8px;margin-top:2.5mm;background:#fff;}
+.ev-h{font-size:.7rem;font-family:sans-serif;color:#7c5a3a;font-weight:bold;margin:2.5mm 0 1.2mm;letter-spacing:.04em;}
+.ev-h:first-child{margin-top:0;}
+table.mini{width:100%;border-collapse:collapse;font-size:.76rem;}
+table.mini th,table.mini td{border:1px solid #ddd6c6;padding:2px 5px;text-align:center;}
+table.mini tr:first-child th{background:#f5f2e9;font-weight:normal;color:#6b6355;}
+ol.steps{margin:0;padding-left:1.5em;font-size:.79rem;line-height:1.7;color:#3a3a3a;}
+ol.steps li{margin-bottom:.8mm;}
+.riron{font-size:.79rem;line-height:1.75;background:#f7f5ee;border-left:3px solid #b8a882;padding:5px 9px;color:#3a3a3a;}
+dl.yogo{margin:0;font-size:.74rem;line-height:1.6;}
+dl.yogo dt{font-weight:bold;color:#5a4a2a;margin-top:1.2mm;}
+dl.yogo dd{margin:0 0 0 1em;color:#4a4a4a;}
+.tag{display:inline-block;background:#f3efe4;border:1px solid var(--soft);border-radius:4px;padding:0 6px;font-size:.8rem;}
+
+.ctx{display:grid;grid-template-columns:1fr;gap:3mm;}
+.ctxbox{border:1px solid var(--soft);border-radius:6px;background:#fff;padding:7px 12px 9px;}
+.ctxbox h4{margin:0 0 2mm;font-size:.88rem;font-family:sans-serif;color:#5a4a2a;border-bottom:1px solid #e8e2d2;padding-bottom:1.2mm;}
+.ctxbox ul{margin:0;padding:0;list-style:none;font-size:.82rem;line-height:1.72;}
+.ctxbox li{margin-bottom:1.6mm;}
+.ctxbox li:last-child{margin-bottom:0;}
+.src{display:inline-block;font-size:.62rem;font-family:sans-serif;background:#f0ece0;border:1px solid var(--soft);border-radius:3px;padding:0 4px;margin-right:5px;color:#7c5a3a;vertical-align:1.5px;white-space:nowrap;}
+.ctxnote{font-size:.7rem;color:var(--muted);margin-top:2mm;line-height:1.65;}
+
+.caveat{margin-top:4mm;font-size:.68rem;color:var(--muted);line-height:1.7;border-top:1px solid #ddd6c6;padding-top:2mm;}
+footer{max-width:210mm;margin:6px auto 24px;font-size:.68rem;color:#8a8276;text-align:center;font-family:sans-serif;line-height:1.7;}
+
+@media (max-width:800px){
+  .persons{grid-template-columns:1fr;}
+  #sheet{width:100%;margin:8px 0;padding:4mm 3mm;box-shadow:none;}
+  .vlbl{display:block;margin-bottom:1mm;}
+}
+@media print{
+  body{background:#fff;}
+  #panel,#noprint{display:none!important;}
+  #sheet{box-shadow:none;margin:0;width:auto;padding:3mm;}
+  section{break-inside:avoid;}
+  .ev{break-inside:avoid;}
+}
+@page{size:A4 portrait;margin:8mm;}
+</style>
+</head>
+<body>
+
+<div id="panel">
+  <h1>相性チェックメモ（算命学・九星気学ベース／学習用）</h1>
+  <div class="persons">
+    <div class="pbox">
+      <h3>自分（Aさん）</h3>
+      <div class="frow">
+        <div class="fld"><label>お名前（任意）</label><input id="a_name" type="text" placeholder="Aさん"></div>
+      </div>
+      <div class="frow">
+        <div class="fld"><label>元号/西暦</label>
+          <select id="a_era"><option value="AD">西暦</option><option value="R">令和</option><option value="H">平成</option><option value="S">昭和</option><option value="T">大正</option><option value="M">明治</option></select></div>
+        <div class="fld"><label>年</label><input id="a_y" type="number" min="1" max="2100"></div>
+        <div class="fld"><label>月</label><input id="a_m" type="number" min="1" max="12"></div>
+        <div class="fld"><label>日</label><input id="a_d" type="number" min="1" max="31"></div>
+      </div>
+    </div>
+    <div class="pbox">
+      <h3>相手（Bさん）</h3>
+      <div class="frow">
+        <div class="fld"><label>お名前（任意）</label><input id="b_name" type="text" placeholder="Bさん"></div>
+      </div>
+      <div class="frow">
+        <div class="fld"><label>元号/西暦</label>
+          <select id="b_era"><option value="AD">西暦</option><option value="R">令和</option><option value="H">平成</option><option value="S">昭和</option><option value="T">大正</option><option value="M">明治</option></select></div>
+        <div class="fld"><label>年</label><input id="b_y" type="number" min="1" max="2100"></div>
+        <div class="fld"><label>月</label><input id="b_m" type="number" min="1" max="12"></div>
+        <div class="fld"><label>日</label><input id="b_d" type="number" min="1" max="31"></div>
+      </div>
+    </div>
+  </div>
+  <div id="actrow">
+    <button id="btnRun">相性を診断する</button>
+    <button id="btnPrint" style="background:#fff;color:#5a4a2a;">印刷 / PDF</button>
+    <button id="btnInstall">アプリとしてインストール</button>
+    <span id="msg"></span>
+  </div>
+</div>
+
+<div id="sheet">
+  <h2 id="o_title">相性メモ</h2>
+
+  <section>
+    <h3>基本データ</h3>
+    <table class="basej">
+      <thead><tr><th></th><th>生年月日</th><th>日干支</th><th>日干（五行・陰陽）</th><th>天中殺</th><th>本命星</th></tr></thead>
+      <tbody id="o_basej"></tbody>
+    </table>
+  </section>
+
+  <div class="summary">
+    <h4>まとめ：気をつけたいポイント</h4>
+    <ul class="pts" id="o_cautions"></ul>
+    <h4>関わり方のヒント</h4>
+    <ul class="pts" id="o_tips"></ul>
+  </div>
+
+  <section>
+    <h3>① 五行（日干）から見た相性</h3>
+    <div id="o_gogyo"></div>
+  </section>
+
+  <section>
+    <h3>② 十大主星から見た、お互いの映り方</h3>
+    <div id="o_juttai_ab" style="margin-bottom:4mm"></div>
+    <div id="o_juttai_ba"></div>
+  </section>
+
+  <section>
+    <h3>③ 天中殺の重なり</h3>
+    <div id="o_tcs"></div>
+  </section>
+
+  <section>
+    <h3>④ 九星気学（本命星）から見た相性</h3>
+    <div id="o_kyusei"></div>
+  </section>
+
+  <section>
+    <h3>⑤ 関係性別に見た、気をつけたい点</h3>
+    <div class="ctx" id="o_ctx"></div>
+    <div class="ctxnote">各項目の先頭の札は、その指摘が①〜③のどの判定から導かれているかを示します。同じ関係でも、友人・伴侶・仕事仲間では摩擦の出る場所が変わるため、文脈ごとに書き分けています。</div>
+  </section>
+
+  <div class="caveat">
+    <b>この「根拠」の性質について</b><br>
+    本メモに記した導出ステップと典拠は、<b>算命学・九星気学という理論体系の内部で、どの数値からどの規則によってその結論が導かれたか</b>を示したものです。計算過程は機械的で検証可能ですが、その結論が実際の人間関係とどの程度対応するかについては、統計的な実証データは存在しません。「理論上はこう読む」という一つの見方として扱い、当たる／当たらないの断定や、進路・結婚・就職・金銭等の重大な決定の根拠にはしないでください。
+  </div>
+</div>
+
+<footer id="noprint">
+  本ツールは個人の学習用に作成したものです。入力データは端末内でのみ計算され、外部へ送信・保存されません（ページを閉じると消えます）。
+</footer>
+
+<script>
+/* ===== 計算エンジン（meishiki.htmlの算出ロジックを流用・無改変） ===== */
+const STEMS=["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
+const BRANCHES=["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+function kanshi(i){i=((i%60)+60)%60;return STEMS[i%10]+BRANCHES[i%12];}
+function jdn(y,m,d){const a=Math.floor((14-m)/12),yy=y+4800-a,mm=m+12*a-3;
+  return d+Math.floor((153*mm+2)/5)+365*yy+Math.floor(yy/4)-Math.floor(yy/100)+Math.floor(yy/400)-32045;}
+function dayIdx(y,m,d){return (((jdn(y,m,d)+49)%60)+60)%60;}
+function _solJD(y,m,d,h){const a=Math.floor((14-m)/12),yy=y+4800-a,mm=m+12*a-3;const j=d+Math.floor((153*mm+2)/5)+365*yy+Math.floor(yy/4)-Math.floor(yy/100)+Math.floor(yy/400)-32045;return j-0.5+(h||0)/24;}
+function _solarLong(jd){const T=(jd-2451545.0)/36525;const L0=280.46646+36000.76983*T+0.0003032*T*T;const M=357.52911+35999.05029*T-0.0001537*T*T;const Mr=M*Math.PI/180;const Ce=(1.914602-0.004817*T-0.000014*T*T)*Math.sin(Mr)+(0.019993-0.000101*T)*Math.sin(2*Mr)+0.000289*Math.sin(3*Mr);const om=125.04-1934.136*T;const lam=L0+Ce-0.00569-0.00478*Math.sin(om*Math.PI/180);return ((lam%360)+360)%360;}
+const SETSU_DEG={"小寒":285,"大寒":300,"立春":315,"雨水":330,"啓蟄":345,"春分":0,"清明":15,"穀雨":30,"立夏":45,"小満":60,"芒種":75,"夏至":90,"小暑":105,"大暑":120,"立秋":135,"処暑":150,"白露":165,"秋分":180,"寒露":195,"霜降":210,"立冬":225,"小雪":240,"大雪":255,"冬至":270};
+const SETSU_MONTH={"小寒":1,"大寒":1,"立春":2,"雨水":2,"啓蟄":3,"春分":3,"清明":4,"穀雨":4,"立夏":5,"小満":5,"芒種":6,"夏至":6,"小暑":7,"大暑":7,"立秋":8,"処暑":8,"白露":9,"秋分":9,"寒露":10,"霜降":10,"立冬":11,"小雪":11,"大雪":12,"冬至":12};
+function _jdnToDate(z){const a=z+32044,b=Math.floor((4*a+3)/146097),c=a-Math.floor(146097*b/4);const dd=Math.floor((4*c+3)/1461),e=c-Math.floor(1461*dd/4),mm=Math.floor((5*e+2)/153);const day=e-Math.floor((153*mm+2)/5)+1;const month=mm+3-12*Math.floor(mm/10);const year=100*b+dd-4800+Math.floor(mm/10);return [year,month,day];}
+function deltaT(year){var t,u;
+  if(year>=2005&&year<2050){t=year-2000;return 62.92+0.32217*t+0.005589*t*t;}
+  if(year>=1986&&year<2005){t=year-2000;return 63.86+0.3345*t-0.060374*t*t+0.0017275*t*t*t+0.000651814*Math.pow(t,4)+0.00002373599*Math.pow(t,5);}
+  if(year>=1961&&year<1986){t=year-1975;return 45.45+1.067*t-t*t/260-t*t*t/718;}
+  if(year>=1941&&year<1961){t=year-1950;return 29.07+0.407*t-t*t/233+t*t*t/2547;}
+  if(year>=1920&&year<1941){t=year-1920;return 21.20+0.84493*t-0.076100*t*t+0.0020936*t*t*t;}
+  if(year>=1900&&year<1920){t=year-1900;return -2.79+1.494119*t-0.0598939*t*t+0.0061966*t*t*t-0.000197*Math.pow(t,4);}
+  if(year>=2050){t=year-2000;return 62.92+0.32217*t+0.005589*t*t;}
+  u=(year-1820)/100;return -20+32*u*u;
+}
+function termDateJST(year,name){const target=SETSU_DEG[name];const mon=SETSU_MONTH[name];let jd=_solJD(year,mon,7,3);for(let i=0;i<12;i++){const l=_solarLong(jd);const diff=((l-target+540)%360)-180;jd-=diff*1.01457;}
+  const jdUT=jd-deltaT(year)/86400;
+  const jdInt=Math.floor(jdUT+9/24+0.5);
+  return _jdnToDate(jdInt);}
+function termDay(year,name){return termDateJST(year,name)[2];}
+function yearIdx(sy){return (((sy-1984)%60)+60)%60;}
+function honmei(sy){let n=String(sy).split("").reduce((a,c)=>a+ +c,0);while(n>=10)n=String(n).split("").reduce((a,c)=>a+ +c,0);let s=11-n;if(s>9)s-=9;if(s===0)s=9;return s;}
+function tsuhen(ds,t){const ed=Math.floor(ds/2),et=Math.floor(t/2),same=(ds%2)===(t%2);
+  if(ed===et)return same?"比肩":"劫財";if((ed+1)%5===et)return same?"食神":"傷官";if((ed+2)%5===et)return same?"偏財":"正財";
+  if((et+2)%5===ed)return same?"偏官":"正官";return same?"偏印":"印綬";}
+function voidBranches(dStem,dBranch){const head=((dBranch-dStem)%12+12)%12;return [(head+10)%12,(head+11)%12];}
+function tenchusatsuName(dStem,dBranch){const v=voidBranches(dStem,dBranch);return BRANCHES[v[0]]+BRANCHES[v[1]]+"天中殺";}
+const ELEM_STEM=["木","木","火","火","土","土","金","金","水","水"];
+const STAR={1:"一白水星",2:"二黒土星",3:"三碧木星",4:"四緑木星",5:"五黄土星",6:"六白金星",7:"七赤金星",8:"八白土星",9:"九紫火星"};
+const KYU_ELEM={1:"水",2:"土",3:"木",4:"木",5:"土",6:"金",7:"金",8:"土",9:"火"};
+function solarYearOf(y,m,d){const ris=termDay(y,"立春");return (m<2||(m===2&&d<ris))?y-1:y;}
+const ERA_BASE={M:1867,T:1911,S:1925,H:1988,R:2018};
+function toAD(era,y){return era==="AD"?y:ERA_BASE[era]+y;}
+/* ===== ここまで既存アプリから移植した計算エンジン ===== */
+
+/* ===== 相性判定ロジック＋根拠生成（今回追加） ===== */
+const GEN_NEXT={"木":"火","火":"土","土":"金","金":"水","水":"木"};
+const OVERCOME={"木":"土","土":"水","水":"火","火":"金","金":"木"};
+const YINYANG=s=>s%2===0?"陽":"陰";
+const ELEM_IDX={"木":0,"火":1,"土":2,"金":3,"水":4};
+
+function elemRelation(e1,e2){
+  if(e1===e2) return {type:"比和"};
+  if(GEN_NEXT[e1]===e2) return {type:"相生",dir:"1to2"};
+  if(GEN_NEXT[e2]===e1) return {type:"相生",dir:"2to1"};
+  if(OVERCOME[e1]===e2) return {type:"相剋",dir:"1to2"};
+  return {type:"相剋",dir:"2to1"};
+}
+
+/* 旬（10日ひと区切り）の構成と、そこに現れない2支＝空亡 */
+function junInfo(dStem,dBranch){
+  const head=((dBranch-dStem)%12+12)%12;
+  let start=-1;
+  for(let k=0;k<60;k++){ if(k%10===0&&k%12===head){start=k;break;} }
+  const list=[]; for(let i=0;i<10;i++) list.push(kanshi(start+i));
+  const v=voidBranches(dStem,dBranch);
+  return {name:"甲"+BRANCHES[head]+"旬",list,voids:[BRANCHES[v[0]],BRANCHES[v[1]]]};
+}
+
+/* 本命星の算出過程を文字列で残す */
+function honmeiSteps(sy){
+  const digits=String(sy).split("");
+  const steps=[];
+  let n=digits.reduce((a,c)=>a+ +c,0);
+  steps.push(`${digits.join("＋")}＝${n}`);
+  while(n>=10){ const d=String(n).split(""); const nn=d.reduce((a,c)=>a+ +c,0); steps.push(`${d.join("＋")}＝${nn}`); n=nn; }
+  let s=11-n; const l=[`11−${n}＝${s}`];
+  if(s>9){ l.push(`${s}は9を超えるので9を引く → ${s-9}`); s-=9; }
+  if(s===0){ l.push("0のため9とする"); s=9; }
+  return {steps,last:l,star:s};
+}
+
+/* 通変星が決まる理由（五行関係＋陰陽） */
+function tsuhenReason(ds,t){
+  const ed=Math.floor(ds/2),et=Math.floor(t/2);
+  const same=(ds%2)===(t%2);
+  let rel,relShort;
+  if(ed===et){rel="相手の五行は自分と同じ";relShort="同じ五行";}
+  else if((ed+1)%5===et){rel="自分の五行が相手の五行を生む（自分が与える側）";relShort="自分が生む";}
+  else if((ed+2)%5===et){rel="自分の五行が相手の五行を剋す（自分が抑える側）";relShort="自分が剋す";}
+  else if((et+2)%5===ed){rel="相手の五行が自分の五行を剋す（自分が抑えられる側）";relShort="相手が剋す";}
+  else {rel="相手の五行が自分の五行を生む（自分が受け取る側）";relShort="相手が生む";}
+  return {rel,relShort,same,eSelf:ELEM_STEM[ds],eOther:ELEM_STEM[t],ySelf:YINYANG(ds),yOther:YINYANG(t)};
+}
+
+const TSUHEN_RULE={
+  "比肩":"同じ五行・同じ陰陽","劫財":"同じ五行・異なる陰陽",
+  "食神":"自分が生む五行・同じ陰陽","傷官":"自分が生む五行・異なる陰陽",
+  "偏財":"自分が剋す五行・同じ陰陽","正財":"自分が剋す五行・異なる陰陽",
+  "偏官":"自分を剋す五行・同じ陰陽","正官":"自分を剋す五行・異なる陰陽",
+  "偏印":"自分を生む五行・同じ陰陽","印綬":"自分を生む五行・異なる陰陽"
+};
+const MAIN_STAR={"比肩":"貫索星","劫財":"石門星","食神":"鳳閣星","傷官":"調舒星","偏財":"禄存星","正財":"司禄星","偏官":"車騎星","正官":"牽牛星","偏印":"龍高星","印綬":"玉堂星"};
+
+/* ===== 五行の相性判定 ===== */
+function gogyoAdvice(nameA,eA,nameB,eB){
+  const r=elemRelation(eA,eB);
+  if(r.type==="比和"){
+    return {rel:"比和",
+      lead:`${nameA}（${eA}）と${nameB}（${eB}）はどちらも同じ五行で、「比和」の関係。`,
+      caution:`似た気質・価値観を持ちやすい半面、お互いの弱点も同じ方向に出るため、同じ場面でそろってつまずいたり、関係がマンネリ化しやすい。`,
+      tip:`役割や得意分野をあえて分担したり、外部の刺激（新しい趣味や交友関係）を取り入れると、関係に良い変化が生まれやすい。`,
+      why:`同質の気が重なるため、増幅はするが変化や補完が起きにくい、と読む。`};
+  }
+  const giver=r.dir==="1to2"?nameA:nameB, receiver=r.dir==="1to2"?nameB:nameA;
+  const ge=r.dir==="1to2"?eA:eB, re=r.dir==="1to2"?eB:eA;
+  if(r.type==="相生"){
+    return {rel:"相生",giver,receiver,
+      lead:`${giver}（${ge}）が${receiver}（${re}）を生かす「相生」の関係。`,
+      caution:`${giver}が${receiver}を支える・与える側になりやすく、気づかないうちに一方的に頑張りすぎて疲れてしまうことがある。`,
+      tip:`${receiver}の側から意識して感謝や労いの言葉を伝えると、${giver}の負担感が和らぎ、関係が長続きしやすい。`,
+      why:`相生は「生む側が気を消耗し、生まれる側が気を得る」一方向の流れとして読むため、関係としては良好でも負担が片側に寄る。`};
+  }
+  return {rel:"相剋",giver,receiver,
+    lead:`${giver}（${ge}）が${receiver}（${re}）を抑える「相剋」の関係。`,
+    caution:`${giver}が主導権を握りやすく、${receiver}は窮屈さや我慢を感じやすい関係になりがち。`,
+    tip:`${giver}は指示や口出しを一歩控え、先に${receiver}の意見や気持ちを聞く場面を意識的に作ると、関係が対等に近づく。`,
+    why:`相剋は一方が他方の働きを抑制する関係。抑える側は自覚がなく、抑えられる側だけが負荷を感じやすいため、非対称な不満が溜まりやすい。`};
+}
+
+/* ===== 十大主星の説明 ===== */
+const STAR_DESC={
+  "比肩":{tag:"対等な仲間",note:"対等で自然体に付き合える関係。ただし譲り合いが少ないと、些細なことで意地の張り合いになりやすい。",tip:"どちらかが折れるより先に、役割や領域をはっきり分けて『棲み分ける』意識を持つと衝突が減る。",why:"同質・同方向の気が並ぶため、主導権が決まらず平行線になりやすいと読む。"},
+  "劫財":{tag:"気は合うが利害に注意",note:"気楽に付き合える半面、お金や物の貸し借り、損得が絡む場面でこじれやすい。",tip:"金銭や労力の負担は『なあなあ』にせず、はっきり分けておくのが長続きのコツ。",why:"同じ五行でも陰陽が異なるため、同じ物を違う形で求め合う＝取り合いになりやすいと読む。"},
+  "食神":{tag:"楽しませてもらえる相手",note:"和やかで楽しい関係になりやすいが、その心地よさゆえに、真剣な話し合いを避けがちになる。",tip:"楽しい雰囲気を大事にしつつも、大事な話は先延ばしにせずきちんと時間を取る。",why:"自分の気が自然に流れ出る関係で、緊張が生じにくいぶん課題が表面化しにくいと読む。"},
+  "傷官":{tag:"刺激的だが振り回されやすい",note:"相手の言動や気分に振り回され、批判や皮肉に傷つきやすい関係になりがち。",tip:"相手の言葉を額面通り受け取りすぎず、少し距離を置いて受け止める余裕を持つ。",why:"気が流れ出る方向は食神と同じだが陰陽が食い違うため、流れが鋭く不安定になると読む。"},
+  "偏財":{tag:"つい自由にしたくなる相手",note:"相手を自分の思うように動かしたくなり、束縛や過干渉になりやすい。",tip:"相手の時間や交友関係には口を出しすぎず、『任せる』意識を持つと関係が楽になる。",why:"自分が剋す＝支配する側に立つ関係。同じ陰陽のため遠慮が働きにくいと読む。"},
+  "正財":{tag:"大切に守り育てたい相手",note:"安定した関係を築きやすい反面、世話を焼きすぎて相手の自立心を奪ってしまうことがある。",tip:"支えることと管理することを混同せず、相手の自主性を尊重する場面を意識的に作る。",why:"自分が剋す関係だが陰陽が異なるため、支配が『保護』の形をとって現れると読む。"},
+  "偏官":{tag:"緊張感を与えてくる相手",note:"相手から強いプレッシャーや厳しさを感じやすく、気が休まらないことがある。",tip:"意見が対立した時ほど、その場で白黒つけようとせず、一度持ち帰って冷静に考える時間を作る。",why:"相手から剋される側に立つ関係。同じ陰陽のため加減が働かず、圧が直接届くと読む。"},
+  "正官":{tag:"きちんとさせようとする相手",note:"相手からルールや常識、体裁を求められ、窮屈さや真面目さの押し付けを感じることがある。",tip:"『こうあるべき』を強く言われた時ほど、自分の本音や事情も丁寧に言葉にして伝える。",why:"剋される関係だが陰陽が異なるため、圧が『規範・筋道』の形をとって現れると読む。"},
+  "偏印":{tag:"精神的に寄りかかりやすい相手",note:"孤独感を紛らわせてくれる反面、依存が強くなりすぎたり、二人だけの内向きな関係になりやすい。",tip:"二人の世界に閉じこもらず、それぞれ別の居場所や相談相手も持っておくと健全な距離が保てる。",why:"相手から気を受け取る側に立つ関係。同じ陰陽のため受け取りが過剰になりやすいと読む。"},
+  "印綬":{tag:"守られ、甘えやすい相手",note:"安心感が強く居心地が良い反面、甘えすぎて自立心や緊張感を失いやすい。",tip:"守ってもらうばかりでなく、自分からも相手を気遣う行動を意識的に増やす。",why:"気を受け取る関係だが陰陽が異なるため、受容が『庇護』の形をとって現れると読む。"}
+};
+
+/* ===== 九星の相性判定（日干の五行とは別立ての文言） ===== */
+const OPPOSITE_STAR={1:9,9:1,2:8,8:2,3:7,7:3,4:6,6:4};
+function kyuseiAdvice(nameA,hA,nameB,hB){
+  if(hA===hB){
+    return {kind:"同会",
+      lead:`${nameA}と${nameB}はどちらも本命星が${STAR[hA]}で、「同会」の関係。`,
+      caution:`物事の捉え方が似ているぶん話は早いが、同じ場面で同じ判断ミスをしやすく、二人だけでは状況を客観視しづらい。`,
+      tip:`判断に迷った時や意見が煮詰まった時は、二人で詰めるより先に、第三者の目を一度通すと精度が上がる。`,
+      why:`同じ星は九星盤上で常に同じ位置を巡るため、巡ってくる運気の波もほぼ同時に訪れる、と読む。`};
+  }
+  if(OPPOSITE_STAR[hA]===hB){
+    return {kind:"対冲",
+      lead:`${nameA}（${STAR[hA]}）と${nameB}（${STAR[hB]}）は、九星盤で正反対の位置に入る「対冲」の関係。`,
+      caution:`優先順位や物事の進め方が正面から食い違いやすく、同じ出来事を見ても解釈が逆になることがある。`,
+      tip:`違いを『どちらが正しいか』で処理せず、『二つの視点が揃った』と扱えると、お互いの死角を補い合える組み合わせになる。`,
+      why:`後天定位盤で向かい合う位置に配される組み合わせ。方位でいう「対冲」にあたり、性質が正反対に振れると読む。`};
+  }
+  const eA=KYU_ELEM[hA], eB=KYU_ELEM[hB];
+  const r=elemRelation(eA,eB);
+  if(r.type==="比和"){
+    return {kind:"比和",
+      lead:`${nameA}（${STAR[hA]}）と${nameB}（${STAR[hB]}）は星は違うが、五行はどちらも${eA}で「比和」。`,
+      caution:`気質の方向性が近く安心しやすい半面、視野の広がりに欠け、二人の判断がいつも同じ方向に偏りやすい。`,
+      tip:`意識して違う情報源・違う意見に触れる機会を作ると、関係が停滞しにくい。`,
+      why:`星は異なるが同じ五行に属するため、気の性質としては重なると読む。`};
+  }
+  const giver=r.dir==="1to2"?nameA:nameB, receiver=r.dir==="1to2"?nameB:nameA;
+  const ge=r.dir==="1to2"?eA:eB, re=r.dir==="1to2"?eB:eA;
+  if(r.type==="相生"){
+    return {kind:"相生",
+      lead:`${nameA}（${STAR[hA]}・${eA}）と${nameB}（${STAR[hB]}・${eB}）は、${giver}（${ge}）が${receiver}（${re}）を生かす「相生」。`,
+      caution:`${giver}が場を整えたり段取りを引き受ける側に回りやすく、役割が固定すると${receiver}の主体性が育ちにくい。`,
+      tip:`場を仕切る役を時々交代してみると、${receiver}の側にも責任感が生まれ、関係のバランスが取れる。`,
+      why:`九星それぞれに配当された五行の相生関係として読む。`};
+  }
+  return {kind:"相剋",
+    lead:`${nameA}（${STAR[hA]}・${eA}）と${nameB}（${STAR[hB]}・${eB}）は、${giver}（${ge}）が${receiver}（${re}）を抑える「相剋」。`,
+    caution:`行動のテンポや優先順位がずれやすく、決める場面で${receiver}が譲る形に落ち着きやすい。`,
+    tip:`結論を急ぐ場面ほど、${receiver}の意見を先に聞く順番にすると、納得感のある決定になりやすい。`,
+    why:`九星それぞれに配当された五行の相剋関係として読む。`};
+}
+
+/* ===== 用語集 ===== */
+const YOGO={
+  "日干支":"生まれた日に割り当てられた干支。十干（甲乙丙丁戊己庚辛壬癸）と十二支（子丑寅卯…）の組み合わせで、60日で一周する。",
+  "日干":"日干支の上の字。算命学では本人そのものを表す、最も中心的な要素とされる。",
+  "五行":"木・火・土・金・水の五つの気。あらゆる物事をこの五つに分類して関係を読む、東洋思想の基本的な枠組み。",
+  "相生":"五行が順に生み出す関係（木→火→土→金→水→木）。生む側が気を与え、生まれる側が気を受け取る。",
+  "相剋":"五行が一つ飛ばしに抑え込む関係（木→土→水→火→金→木）。抑える側が主導権を持つ。",
+  "陰陽":"十干それぞれに割り振られた性質。甲丙戊庚壬が陽、乙丁己辛癸が陰。同じ五行でも陰陽が違えば現れ方が変わる。",
+  "通変星":"日干を基準に、他の干との「五行の関係」と「陰陽が同じか違うか」の組み合わせで10種類に分類したもの。算命学ではこれを十大主星と呼ぶ。",
+  "天中殺":"十干10個と十二支12個を組み合わせると、10日ごとの区切り（旬）で必ず十二支が2つ余る。この余った2支を空亡・天中殺と呼ぶ。",
+  "旬":"六十干支を甲から始まる10日ずつに区切った単位。全部で6つの旬がある。",
+  "本命星":"生まれ年（立春起算）から算出する九星。一白水星から九紫火星まで9種類。",
+  "立春起算":"暦の上の一年の始まりを1月1日ではなく立春（2月4日頃）とする数え方。立春より前の生まれは前年として扱う。",
+  "後天定位盤":"九星を方位に配当した基本の盤。向かい合う位置にある星の組み合わせを「対冲」と呼ぶ。"
+};
+
+/* ===== 人物1名分のデータ算出 ===== */
+function personCalc(y,m,d){
+  const di=dayIdx(y,m,d);
+  const dStem=di%10, dBranch=di%12;
+  const sy=solarYearOf(y,m,d);
+  const hs=honmeiSteps(sy);
+  return {
+    y,m,d,di,dStem,dBranch,solarYear:sy,
+    kanshiNo:di+1,
+    kanshiStr:kanshi(di),
+    stemChar:STEMS[dStem], branchChar:BRANCHES[dBranch],
+    elem:ELEM_STEM[dStem], yin:YINYANG(dStem),
+    jun:junInfo(dStem,dBranch),
+    tcs:tenchusatsuName(dStem,dBranch),
+    tcsGroup:voidBranches(dStem,dBranch).slice().sort((a,b)=>a-b).join(","),
+    honmei:hs.star, honmeiSteps:hs,
+    risshun:termDay(y,"立春")
+  };
+}
+
+/* ===== 関係性別（友人／伴侶／ビジネス）の注意点 ===== */
+const CTX=[
+  {key:"friend",label:"友人として"},
+  {key:"spouse",label:"伴侶として"},
+  {key:"biz",label:"ビジネスパートナーとして"}
+];
+
+/* 十大主星ごと × 関係性ごと（「見る側」が気をつけること） */
+const STAR_CTX={
+  "比肩":{
+    friend:"対等で長続きしやすいが、張り合いが出ると助言が『上から』に聞こえて急に気まずくなる。相手の領域には踏み込みすぎない。",
+    spouse:"家事や育児で『どちらがやるか』の押し付け合いになりやすい。分担は口頭の了解で済ませず、最初にはっきり決めておく。",
+    biz:"判断が似るため意思決定は速いが、死角も共通になる。役割と決裁権を明確に分け、第三者のレビューを挟む。"},
+  "劫財":{
+    friend:"気楽に付き合える反面、貸し借りや割り勘の曖昧さが後々尾を引く。お金のやり取りはその場で清算する。",
+    spouse:"家計の管理方針がぶつかりやすい。財布を完全に一つにするより、共通費と個人費を分けた方が安定しやすい。",
+    biz:"利益配分・持ち分・報酬を口約束にすると高い確率でもめる。始める前に書面で決めておく。"},
+  "食神":{
+    friend:"一緒にいて楽しく長続きするが、深刻な相談はしそびれがち。困った時に頼れる相手になれているか、時々振り返る。",
+    spouse:"家庭は和やかになる反面、将来設計・家計・親の介護といった重い話題を先送りしやすい。話し合う日をあらかじめ決めておく。",
+    biz:"雰囲気は良いが、遅れや問題点の指摘が甘くなる。進捗は数値と期限で管理し、和やかさに頼らない仕組みを作る。"},
+  "傷官":{
+    friend:"話は面白いが、冗談のつもりの一言に傷つくことがある。嫌だった点はその場で軽く伝え、溜め込まない。",
+    spouse:"相手の感情の起伏に巻き込まれやすい。機嫌を自分の責任と考えすぎないことが、長く続けるコツ。",
+    biz:"指摘が鋭く品質は上がるが、人前での批判は関係を壊す。フィードバックは一対一の場で、と取り決めておく。"},
+  "偏財":{
+    friend:"予定や交友関係に口を出しすぎると、相手が静かに離れていく。誘いを断られても深追いしない。",
+    spouse:"束縛や過干渉が最大のリスク。相手の時間・交友・お金について『報告を求めない領域』を決めておく。",
+    biz:"相手の担当領域まで手を出しがち。権限の線引きを明文化し、任せた以上は結果が出るまで口を挟まない。"},
+  "正財":{
+    friend:"面倒見が良く頼られるが、いつの間にか一方的な世話役になりやすい。自分が疲れていないか点検する。",
+    spouse:"安定した家庭を築きやすい反面、相手を子ども扱いしてしまうことがある。決定を相手に委ねる場面を意識的に作る。",
+    biz:"堅実な運営になるが、細部まで管理すると相手の成長機会を奪う。任せる範囲を段階的に広げていく。"},
+  "偏官":{
+    friend:"会うと気が張るため、疲れている時期は自然に足が遠のく。無理に頻度を保とうとせず、間隔が空くことを許容する。",
+    spouse:"日常的な緊張が蓄積しやすい。一人になれる時間と場所を物理的に確保することが、関係の維持に直結する。",
+    biz:"厳しさが品質を上げる方向に働けば強力。相手を『チェック役』と役割として位置づけると、圧が人格攻撃に転じにくい。"},
+  "正官":{
+    friend:"常識や体裁を求められ、窮屈に感じることがある。合わせきれない部分は早めに『自分はこうしたい』と伝える。",
+    spouse:"生活のルールや世間体をめぐって摩擦が出やすい。どこまでを共通ルールとし、どこからを個人の自由とするか、線引きを話し合う。",
+    biz:"規律が整い対外的な信用は得やすい。一方で新しい試みが潰されやすいので、『試行は別枠』と決めておくと動きやすい。"},
+  "偏印":{
+    friend:"深く分かり合える反面、二人だけの閉じた関係になりやすい。他の友人との関係も並行して保つ。",
+    spouse:"精神的な結びつきは強いが、依存が深まると社会との接点が細る。それぞれの仕事・趣味・交友を手放さない。",
+    biz:"発想面では刺激し合えるが、内輪の論理で進みやすい。外部の意見や市場の反応を定期的に入れる。"},
+  "印綬":{
+    friend:"安心して頼れるが、甘えが常態化すると対等さが崩れる。相手に何かを返す機会を意識的に作る。",
+    spouse:"居心地の良さは抜群だが、『守る側・守られる側』で役割が固定しやすい。時々立場を入れ替えてみる。",
+    biz:"判断を相手任せにしがち。自分の担当範囲では最終判断を自分で下す習慣を持たないと、責任の所在が曖昧になる。"}
+};
+
+/* 五行関係 × 関係性 */
+function gogyoCtx(g,ctx){
+  if(g.rel==="比和"){
+    return {friend:"話が合って一緒にいて楽だが、二人だけでいると世界が狭くなりやすい。別々の交友関係も持っておく。",
+      spouse:"価値観が近く衝突は少ないが、同じ弱点を持つため、家計や健康など同じところで二人そろってつまずきやすい。",
+      biz:"得意分野が重なるぶん、苦手分野が二人とも空白になる。足りない機能は外部から補う前提で体制を組む。"}[ctx];
+  }
+  const G=g.giver,R=g.receiver;
+  if(g.rel==="相生"){
+    return {friend:`${G}が誘う・気を回す役に固定されやすい。時々${R}の側から声をかけると、対等さが保てる。`,
+      spouse:`${G}が支える側に回り続けると、感謝が当たり前になった時に一気に消耗する。労いを言葉にする習慣を持つ。`,
+      biz:`${G}が実務や調整を引き受けやすく、貢献が見えにくくなる。役割と評価基準を明文化しておく。`}[ctx];
+  }
+  return {friend:`${G}の意見に${R}が合わせる形になりやすい。行き先や予定を${R}が決める番を意識的に作る。`,
+    spouse:`家庭内の決定権が${G}に偏りやすい。大きな決定は、${R}の同意を明示的に確認してから進める。`,
+    biz:`${G}が${R}の判断を上書きしがち。決裁範囲を分け、${R}の領域では${G}が口を出さない取り決めにする。`}[ctx];
+}
+
+/* 天中殺 × 関係性 */
+function tcsCtx(same,ctx){
+  if(same){
+    return {friend:"二人とも落ち込む時期が重なる。その時期は無理に会って励まし合おうとしなくてよい。",
+      spouse:"判断力が鈍る時期が重なるため、転居・転職・出産・大きな買い物が同時期に集中しないよう、時期をずらす。",
+      biz:"起業・契約・大型投資のタイミングが重なると危険。重要な意思決定には、必ず二人以外の視点を一つ入れる。"}[ctx];
+  }
+  return {friend:"片方が沈んでいる時にもう片方が元気なので、支え合いが自然に成立しやすい。",
+    spouse:"交互に支え役を担える。相手の不調期を把握しておくと、諍いを『相性の問題』と取り違えずに済む。",
+    biz:"リスクの谷がずれるため、重要局面の担当を、その時期に調子の良い側へ寄せる運用ができる。"}[ctx];
+}
+
+/* ===== UI ===== */
+const $=id=>document.getElementById(id);
+function val(id){const v=$(id).value;return v===""?null:+v;}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+const GCLS={"木":"gk","火":"gh","土":"gd","金":"gki","水":"gs"};
+function gtag(e){return `<span class="gogyo ${GCLS[e]}">${e}</span>`;}
+
+/* 根拠ブロックの組み立て */
+function evidence(o){
+  let h='<div class="ev">';
+  if(o.data){ h+='<div class="ev-h">算出データ</div>'+o.data; }
+  h+='<div class="ev-h">導出ステップ</div><ol class="steps">'+o.steps.map(s=>`<li>${s}</li>`).join("")+'</ol>';
+  h+='<div class="ev-h">根拠となる理論</div><div class="riron">'+o.riron+'</div>';
+  if(o.terms&&o.terms.length){
+    h+='<div class="ev-h">用語</div><dl class="yogo">'+
+      o.terms.filter(t=>YOGO[t]).map(t=>`<dt>${t}</dt><dd>${YOGO[t]}</dd>`).join("")+'</dl>';
+  }
+  h+='</div>';
+  return h;
+}
+function verdict(lead,caution,tip,why){
+  return `<div class="verdict"><div class="vlead">${lead}</div>`
+    +`<div class="vrow"><span class="vlbl">この読みの理由</span>${why}</div>`
+    +`<div class="vrow vcau"><span class="vlbl">気をつけたい点</span>${caution}</div>`
+    +`<div class="vrow vtip"><span class="vlbl">関わり方のヒント</span>${tip}</div></div>`;
+}
+
+function run(){
+  const ay=val("a_y"),am=val("a_m"),ad=val("a_d");
+  const by=val("b_y"),bm=val("b_m"),bd=val("b_d");
+  if(!ay||!am||!ad||!by||!bm||!bd){$("msg").textContent="両方の生年月日を入力してください";return;}
+  const nameA=$("a_name").value.trim()||"Aさん";
+  const nameB=$("b_name").value.trim()||"Bさん";
+  const YA=toAD($("a_era").value,ay), YB=toAD($("b_era").value,by);
+
+  let pA,pB;
+  try{ pA=personCalc(YA,am,ad); pB=personCalc(YB,bm,bd); }
+  catch(e){ $("msg").textContent="計算エラー：入力内容をご確認ください"; return; }
+
+  $("o_title").textContent=`${nameA} × ${nameB} の相性メモ`;
+
+  /* --- 基本データ --- */
+  $("o_basej").innerHTML=[[nameA,YA,am,ad,pA],[nameB,YB,bm,bd,pB]].map(([n,Y,M,D,p])=>
+    `<tr><th>${esc(n)}</th><td>${Y}年${M}月${D}日</td><td><b>${p.kanshiStr}</b><span class="no">（${p.kanshiNo}番）</span></td>`
+    +`<td>${p.stemChar}${gtag(p.elem)}<span class="no">${p.yin}</span></td>`
+    +`<td>${p.tcs}</td><td>${STAR[p.honmei]}</td></tr>`).join("");
+
+  const cautions=[],tips=[];
+  const push=(arr,label,text)=>{const s=label?`<b>${label}：</b>${text}`:text; if(!arr.some(x=>x===s))arr.push(s);};
+
+  /* --- ① 五行（日干） --- */
+  const g=gogyoAdvice(nameA,pA.elem,nameB,pB.elem);
+  const gRel=elemRelation(pA.elem,pB.elem);
+  const seq=["木","火","土","金","水"];
+  const genLine=seq.map(e=>e===pA.elem||e===pB.elem?`<b>${e}</b>`:e).join("→")+"→木";
+  $("o_gogyo").innerHTML=verdict(g.lead,g.caution,g.tip,g.why)+evidence({
+    data:`<table class="mini"><tr><th></th><th>日干支</th><th>日干</th><th>五行</th><th>陰陽</th></tr>`
+      +`<tr><th>${esc(nameA)}</th><td>${pA.kanshiStr}</td><td>${pA.stemChar}</td><td>${pA.elem}</td><td>${pA.yin}</td></tr>`
+      +`<tr><th>${esc(nameB)}</th><td>${pB.kanshiStr}</td><td>${pB.stemChar}</td><td>${pB.elem}</td><td>${pB.yin}</td></tr></table>`,
+    steps:[
+      `生年月日を六十干支の通し番号に変換（ユリウス通日から算出）。${esc(nameA)}＝<b>${pA.kanshiNo}番 ${pA.kanshiStr}</b>／${esc(nameB)}＝<b>${pB.kanshiNo}番 ${pB.kanshiStr}</b>`,
+      `干支の上の字（日干）を取り出す。→ ${esc(nameA)}＝<b>${pA.stemChar}</b>／${esc(nameB)}＝<b>${pB.stemChar}</b>`,
+      `十干を五行に配当する（甲乙＝木、丙丁＝火、戊己＝土、庚辛＝金、壬癸＝水）。→ ${esc(nameA)}＝<b>${pA.elem}</b>／${esc(nameB)}＝<b>${pB.elem}</b>`,
+      gRel.type==="比和"
+        ? `二人とも同じ五行のため、相生でも相剋でもない「<b>比和</b>」にあたる。`
+        : gRel.type==="相生"
+          ? `五行相生の順序「${genLine}」に照らすと、<b>${g.giver===nameA?pA.elem:pB.elem}</b>の次が<b>${g.giver===nameA?pB.elem:pA.elem}</b>。よって「${g.giver===nameA?pA.elem:pB.elem}が${g.giver===nameA?pB.elem:pA.elem}を生む」＝<b>相生</b>。`
+          : `五行相剋の順序「木→土→水→火→金→木」に照らすと、<b>${g.giver===nameA?pA.elem:pB.elem}</b>が<b>${g.giver===nameA?pB.elem:pA.elem}</b>を剋す。よって<b>相剋</b>。`,
+      `方向は <b>${g.rel==="比和"?"双方向（同質）":esc(g.giver)+" → "+esc(g.receiver)}</b>。`
+    ],
+    riron:`<b>五行説（相生・相剋）</b>　万物を木・火・土・金・水の五つの気に配し、その間の関係を読む東洋思想の基本枠組み。順に生み出す関係を「相生」（木は火を生み、火は土を生む…）、一つ飛ばしに抑え込む関係を「相剋」（木は土を剋し、土は水を剋す…）とする。算命学では生まれた日の干（日干）を本人自身と見るため、二人の日干の五行関係が、そのまま関係性の基本構造として読まれる。`,
+    terms:["日干支","日干","五行","相生","相剋"]
+  });
+  push(cautions,null,g.caution); push(tips,null,g.tip);
+
+  /* --- ② 十大主星 --- */
+  const sAB=tsuhen(pA.dStem,pB.dStem), sBA=tsuhen(pB.dStem,pA.dStem);
+  const rAB=tsuhenReason(pA.dStem,pB.dStem), rBA=tsuhenReason(pB.dStem,pA.dStem);
+  const dAB=STAR_DESC[sAB], dBA=STAR_DESC[sBA];
+  const mkStar=(nSelf,nOther,pSelf,pOther,star,rr,dd)=>
+    verdict(`<b>${esc(nSelf)}</b>から見ると、${esc(nOther)}は <span class="tag">${star}（${MAIN_STAR[star]}）</span>＝${dd.tag}`,dd.note,dd.tip,dd.why)
+    +evidence({
+      steps:[
+        `基準は<b>${esc(nSelf)}自身の日干＝${pSelf.stemChar}</b>（${rr.eSelf}・${rr.ySelf}）。相手の日干は<b>${pOther.stemChar}</b>（${rr.eOther}・${rr.yOther}）。`,
+        `五行の関係を見る。→ ${rr.rel}`,
+        `陰陽を見る。${pSelf.stemChar}は${rr.ySelf}、${pOther.stemChar}は${rr.yOther}。→ <b>${rr.same?"同じ陰陽":"異なる陰陽"}</b>`,
+        `「${rr.relShort}」×「${rr.same?"同じ陰陽":"異なる陰陽"}」の組み合わせに対応する通変星は <b>${star}</b>（定義：${TSUHEN_RULE[star]}）。`,
+        `算命学の呼称に直すと <b>${MAIN_STAR[star]}</b>。`
+      ],
+      riron:`<b>通変星（十神）の定義</b>　日干を「自分」とする基準点に置き、他の干との関係を〈五行が同じ／自分が生む／自分が剋す／自分を剋す／自分を生む〉の5通りに分け、さらに〈陰陽が同じ／異なる〉の2通りを掛け合わせて、5×2＝10種に分類したもの。算命学ではこれを十大主星と呼ぶ。同じ二人でも<b>どちらから見るかで星が変わる</b>のが要点で、関係の非対称性はここに現れる。`,
+      terms:["陰陽","通変星"]
+    });
+  $("o_juttai_ab").innerHTML=mkStar(nameA,nameB,pA,pB,sAB,rAB,dAB);
+  $("o_juttai_ba").innerHTML=mkStar(nameB,nameA,pB,pA,sBA,rBA,dBA);
+  push(cautions,`${nameA}から見た${nameB}（${sAB}）`,dAB.note);
+  push(cautions,`${nameB}から見た${nameA}（${sBA}）`,dBA.note);
+  push(tips,`${nameA}側の工夫`,dAB.tip);
+  push(tips,`${nameB}側の工夫`,dBA.tip);
+
+  /* --- ③ 天中殺 --- */
+  const sameTcs=pA.tcsGroup===pB.tcsGroup;
+  const tcsV=sameTcs
+    ? verdict(`二人とも<b>${pA.tcs}</b>。同じ天中殺グループに属する。`,
+        `強い縁を感じやすい相性だが、調子を崩したり判断を誤りやすい時期が二人そろって同時に来るため、支え合いが利きにくい。`,
+        `天中殺の時期には、結婚・転職・大きな買い物といった重大な決断を二人一緒に重ねることは避け、普段以上にお互いを労わる。`,
+        `空亡は日干支の属する旬から決まるため、同じ旬に生まれた者どうしは空亡する支も一致する。したがって運気の谷が重なる。`)
+    : verdict(`${esc(nameA)}は<b>${pA.tcs}</b>、${esc(nameB)}は<b>${pB.tcs}</b>。天中殺の時期は異なる。`,
+        `時期がずれているぶん、片方の不調がもう片方に伝染しにくい。相性上の弱点というより、むしろ支え合いやすい条件。`,
+        `片方が調子を崩しやすい時期に、もう片方が支え役に回れる組み合わせ。相手の不調のサインに気づいたら、早めに声をかけると良い。`,
+        `空亡する支が異なるため、運気の谷が同時には来ないと読む。`);
+  $("o_tcs").innerHTML=tcsV+evidence({
+    data:`<table class="mini"><tr><th></th><th>日干支</th><th>属する旬</th><th>旬に現れない2支</th></tr>`
+      +`<tr><th>${esc(nameA)}</th><td>${pA.kanshiStr}</td><td>${pA.jun.name}</td><td><b>${pA.jun.voids.join("・")}</b></td></tr>`
+      +`<tr><th>${esc(nameB)}</th><td>${pB.kanshiStr}</td><td>${pB.jun.name}</td><td><b>${pB.jun.voids.join("・")}</b></td></tr></table>`,
+    steps:[
+      `六十干支は、甲で始まる10個ひと区切り（旬）が6つで構成される。`,
+      `${esc(nameA)}の<b>${pA.kanshiStr}</b>が属するのは<b>${pA.jun.name}</b>。構成は ${pA.jun.list.join("・")} の10個。`,
+      `この10個に使われている十二支を数えると10種類しかなく、<b>${pA.jun.voids.join("・")}</b>の2支が現れない。この2支が空亡＝<b>${pA.tcs}</b>。`,
+      `${esc(nameB)}も同様に算出 → <b>${pB.jun.name}</b>、現れない2支は<b>${pB.jun.voids.join("・")}</b>＝<b>${pB.tcs}</b>。`,
+      sameTcs?`二人の空亡支が<b>一致</b>する。`:`二人の空亡支は<b>一致しない</b>。`
+    ],
+    riron:`<b>空亡（天中殺）</b>　十干は10個、十二支は12個あるため、甲から順に組み合わせると10個でひと区切りになり、十二支が必ず2つ余る。この「干が配られなかった2支」を空亡と呼び、算命学では天中殺という。余った支が巡ってくる年・月を、足場が定まりにくい時期と読む。算出は機械的で、恣意の入る余地がない点がこの指標の特徴。`,
+    terms:["旬","天中殺"]
+  });
+  if(sameTcs){ push(cautions,"天中殺",`二人とも${pA.tcs}で、運気の谷が同時に来る。重大な決断を同時期に重ねない。`); }
+  push(tips,null,sameTcs
+    ?`天中殺の時期には、結婚・転職・大きな買い物といった重大な決断を二人一緒に重ねない。`
+    :`片方が調子を崩しやすい時期に、もう片方が支え役に回れる。相手の不調のサインに早めに気づく。`);
+
+  /* --- ④ 九星気学 --- */
+  const k=kyuseiAdvice(nameA,pA.honmei,nameB,pB.honmei);
+  const hsA=pA.honmeiSteps, hsB=pB.honmeiSteps;
+  const yearNote=p=>p.solarYear!==p.y?`（${p.m}月${p.d}日は立春〈${p.m<=2?p.y+"年2月"+p.risshun+"日":"—"}〉より前のため<b>${p.solarYear}年</b>として扱う）`:"";
+  $("o_kyusei").innerHTML=verdict(k.lead,k.caution,k.tip,k.why)+evidence({
+    data:`<table class="mini"><tr><th></th><th>起算年</th><th>数字根</th><th>本命星</th><th>五行</th></tr>`
+      +`<tr><th>${esc(nameA)}</th><td>${pA.solarYear}年</td><td>${hsA.steps.join(" → ")}</td><td><b>${STAR[pA.honmei]}</b></td><td>${KYU_ELEM[pA.honmei]}</td></tr>`
+      +`<tr><th>${esc(nameB)}</th><td>${pB.solarYear}年</td><td>${hsB.steps.join(" → ")}</td><td><b>${STAR[pB.honmei]}</b></td><td>${KYU_ELEM[pB.honmei]}</td></tr></table>`,
+    steps:[
+      `九星は立春起算のため、まず起算年を確定する。${esc(nameA)}＝<b>${pA.solarYear}年</b>${yearNote(pA)}／${esc(nameB)}＝<b>${pB.solarYear}年</b>${yearNote(pB)}`,
+      `${esc(nameA)}：各桁を一桁になるまで足す。${hsA.steps.join(" → ")}　その後 ${hsA.last.join("、")} → <b>${STAR[pA.honmei]}</b>`,
+      `${esc(nameB)}：同じ手順で ${hsB.steps.join(" → ")}　その後 ${hsB.last.join("、")} → <b>${STAR[pB.honmei]}</b>`,
+      k.kind==="同会" ? `二つの本命星が<b>一致</b>する＝「同会」。`
+      : k.kind==="対冲" ? `後天定位盤で${STAR[pA.honmei]}と${STAR[pB.honmei]}は<b>向かい合う位置</b>に配される＝「対冲」。`
+      : `九星に配当された五行で比べる。${STAR[pA.honmei]}＝${KYU_ELEM[pA.honmei]}、${STAR[pB.honmei]}＝${KYU_ELEM[pB.honmei]} → <b>${k.kind}</b>。`
+    ],
+    riron:`<b>九星の本命星と盤上の配置</b>　生まれ年（立春起算）の数字根を11から引くことで、一白水星から九紫火星までの9種に配当する。各星には五行も割り当てられており（一白＝水、二黒＝土、三碧・四緑＝木、五黄・八白＝土、六白・七赤＝金、九紫＝火）、星どうしの関係は、後天定位盤での位置関係（同会・対冲）と、配当された五行の相生相剋の両面から読む。日干による①とは別系統の指標のため、二つの結果が食い違うこともあり、その場合は「面によって出方が違う」と読む。`,
+    terms:["本命星","立春起算","後天定位盤"]
+  });
+  push(cautions,"九星",k.caution); push(tips,null,k.tip);
+
+  /* --- ⑤ 関係性別の注意点 --- */
+  $("o_ctx").innerHTML=CTX.map(c=>{
+    const items=[
+      {src:"①五行",txt:gogyoCtx(g,c.key)},
+      {src:`②主星（${esc(nameA)}→${esc(nameB)}・${sAB}）`,txt:STAR_CTX[sAB][c.key]},
+      {src:`②主星（${esc(nameB)}→${esc(nameA)}・${sBA}）`,txt:STAR_CTX[sBA][c.key]},
+      {src:"③天中殺",txt:tcsCtx(sameTcs,c.key)}
+    ];
+    return `<div class="ctxbox"><h4>${c.label}</h4><ul>`
+      +items.map(i=>`<li><span class="src">${i.src}</span>${i.txt}</li>`).join("")
+      +`</ul></div>`;
+  }).join("");
+
+  /* --- まとめ --- */
+  $("o_cautions").innerHTML=cautions.map(c=>`<li>${c}</li>`).join("");
+  $("o_tips").innerHTML=tips.map(t=>`<li>${t}</li>`).join("");
+
+  $("sheet").style.display="block";
+  $("msg").textContent="診断しました";
+}
+
+$("btnRun").addEventListener("click",run);
+$("btnPrint").addEventListener("click",()=>window.print());
+
+/* ===== PWA（インストール・オフライン対応） =====
+   ローカルのファイルを直接開いた場合（file://）は下記がすべて静かに失敗するだけで、
+   アプリ本体の動作には影響しない。 */
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  });
+}
+let deferredPrompt=null;
+window.addEventListener("beforeinstallprompt",e=>{
+  e.preventDefault(); deferredPrompt=e;
+  $("btnInstall").style.display="inline-block";
+});
+$("btnInstall").addEventListener("click",async()=>{
+  if(!deferredPrompt)return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt=null;
+  $("btnInstall").style.display="none";
+});
+window.addEventListener("appinstalled",()=>{
+  deferredPrompt=null;
+  $("btnInstall").style.display="none";
+});
+
+</script>
+</body>
+</html>

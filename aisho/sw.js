@@ -3,7 +3,7 @@
          アイコン等の静的ファイルはキャッシュ優先。
          オフライン時はキャッシュしたHTMLを返す。
    アプリを更新したら CACHE の版番号を上げること。 */
-const CACHE = "aisho-v1";
+const CACHE = "aisho-v2";
 const ASSETS = [
   "./",
   "./index.html",

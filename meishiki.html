@@ -352,6 +352,20 @@ function kanshiNo(stem,branch){for(let k=0;k<60;k++)if(k%10===stem&&k%12===branc
 /* ===== シート固有の追加ロジック ===== */
 const ERA_BASE={M:1867,T:1911,S:1925,H:1988,R:2018};
 function toAD(era,y){return era==="AD"?y:ERA_BASE[era]+y;}
+/* 入力チェック（2026-11-08 追加）：存在しない日付・和暦の範囲外・小数・時刻の範囲外を弾く。③④⑤共通 */
+const ERA_MAX={M:45,T:15,S:64,H:31,R:82},ERA_JA={M:"明治",T:"大正",S:"昭和",H:"平成",R:"令和"};
+function birthErr(era,by,bm,bd,bh,bmin,label){label=label||"";
+  if(![by,bm,bd].every(Number.isInteger))return label+"年・月・日は整数で入力してください";
+  if(era!=="AD"&&(by<1||by>ERA_MAX[era]))return label+ERA_JA[era]+"は1〜"+ERA_MAX[era]+"年で入力してください（"+ERA_JA[era]+by+"年は存在しません）";
+  const y=era==="AD"?by:ERA_BASE[era]+by;
+  if(y<1868||y>2100)return label+"年は1868〜2100年（明治元年〜）の範囲で入力してください";
+  if(bm<1||bm>12)return label+"月は1〜12で入力してください";
+  const last=new Date(y,bm,0).getDate();
+  if(bd<1||bd>last)return label+y+"年"+bm+"月は"+last+"日までです（"+bd+"日は存在しません）";
+  if(bh!=null&&(!Number.isInteger(bh)||bh<0||bh>23))return label+"時は0〜23で入力してください";
+  if(bmin!=null&&(!Number.isInteger(bmin)||bmin<0||bmin>59))return label+"分は0〜59で入力してください";
+  return "";}
+
 function toWareki(y){
   const t=[["令和",2019],["平成",1989],["昭和",1926],["大正",1912],["明治",1868]];
   for(const e of t){if(y>=e[1]){const n=y-e[1]+1;return e[0]+(n===1?"元":n)+"年";}}
@@ -446,6 +460,7 @@ function applyInput(s){if(!s)return;
 function run(){
   const s=gatherInput();
   if(!s.by||!s.bm||!s.bd){$("msg").textContent="生年月日を入力してください";return;}
+  {const e=birthErr(s.era,s.by,s.bm,s.bd,s.bh,s.bmin);if(e){$("msg").textContent="入力エラー："+e;return;}}
   const y=toAD(s.era,s.by);
   const r=compute(y,s.bm,s.bd,s.bh,s.bmin==null?0:s.bmin,s.sex==="m");
   if(s.tyAuto||!s.ty){s.ty=autoTy(s.kinyu);$("ty").value=s.ty;}
@@ -682,6 +697,7 @@ $("btnSavePerson").addEventListener("click",()=>{
   const s=gatherInput();
   if(!s.name){$("msg").textContent="登録には氏名の入力が必要です";return;}
   if(!s.by||!s.bm||!s.bd){$("msg").textContent="生年月日を入力してください";return;}
+  {const e=birthErr(s.era,s.by,s.bm,s.bd,s.bh,s.bmin);if(e){$("msg").textContent="入力エラー："+e;return;}}
   const p=loadPeople();const isNew=!p[s.name];p[s.name]=s;savePeople(p);refreshPeople(s.name);
   $("msg").textContent="「"+s.name+"」を"+(isNew?"登録しました":"上書きしました")+"（現在"+Object.keys(p).length+"名）";});
 $("people").addEventListener("change",()=>{

@@ -63,6 +63,30 @@
 .khead{font-size:1rem;font-weight:bold;background:var(--accent);color:#fff;padding:6px 10px;border-radius:8px;margin:0 0 8px;text-align:center}
 .wrap{max-width:1380px}
 @media(max-width:900px){.grid3{grid-template-columns:1fr}.wrap{max-width:860px}}
+
+  /* ===== 印刷 / PDF（2026-11-08 追加） ===== */
+  .printbtn{position:fixed;right:14px;bottom:14px;z-index:50;padding:11px 18px;background:#7c5a3a;color:#fff;border:none;border-radius:24px;font-size:.95rem;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer;}
+  .print-only{display:none;}
+  @media print{
+    @page{size:A4;margin:10mm;}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+    html,body{background:#fff!important;}
+    header{padding:4px 0 6px!important;background:none!important;color:#7c5a3a!important;border-bottom:2px solid #7c5a3a;text-align:left!important;}
+    header h1{font-size:1.05rem!important;}
+    header p{display:none!important;}
+    .print-only{display:block!important;font-size:.72rem;color:#8a8276;text-align:right;margin:2px 0 4px;}
+    .wrap{max-width:none!important;padding:0!important;}
+    .wrap>.card,.printbtn,.go,.ktabbtn,footer{display:none!important;}
+    .card{box-shadow:none!important;margin:6px 0!important;padding:8px 10px!important;border-radius:6px!important;overflow:visible!important;}
+    .card h2{break-after:avoid;page-break-after:avoid;}
+    tr,svg,.stars,.jintai,.warn-box,.cell{break-inside:avoid;page-break-inside:avoid;}
+    table{font-size:.76rem!important;}
+    th,td{padding:4px 3px!important;}
+    a{color:inherit!important;text-decoration:none!important;}
+    .grid3{display:block!important;}
+    .kcol+.kcol{break-before:page;page-break-before:always;}
+    .khead{font-size:1rem!important;}
+  }
 </style>
 </head>
 <body>
@@ -70,6 +94,7 @@
   <h1>占いアプリ2 ― 3名同時鑑定</h1>
   <p>最大3名の生年月日を入力して、命式・陽占・天中殺・数理法・九星・性格・大運・該当年運勢を横並びで比較（個人学習用）</p>
 </header>
+<div class="print-only" id="printDate"></div>
 
 <div class="wrap">
   <div class="card">
@@ -723,6 +748,18 @@ function hachimon(gogyo,dayStem){
   return {pos,dir:best[0],type:best[1],youin,junyaku};}
 
 function v(id){return document.getElementById(id).value;}
+/* 入力チェック（2026-11-08 追加）：存在しない日付・範囲外・小数・時刻の範囲外を弾く。①②共通 */
+function dateErr(y,m,d,label,lo,hi){lo=lo||1901;hi=hi||2100;label=label||"";
+  if(![y,m,d].every(Number.isInteger))return label+"年・月・日は整数で入力してください";
+  if(y<lo||y>hi)return label+"年は"+lo+"〜"+hi+"年の範囲で入力してください";
+  if(m<1||m>12)return label+"月は1〜12で入力してください";
+  const last=new Date(y,m,0).getDate();
+  if(d<1||d>last)return label+y+"年"+m+"月は"+last+"日までです（"+d+"日は存在しません）";
+  return "";}
+function timeErr(hh,mm,label){label=label||"";
+  if(hh!=null&&(!Number.isInteger(hh)||hh<0||hh>23))return label+"時は0〜23で入力してください";
+  if(mm!=null&&(!Number.isInteger(mm)||mm<0||mm>59))return label+"分は0〜59で入力してください";
+  return "";}
 function getInputs(sfx){let hh=v("hh"+sfx),mm=v("mm"+sfx);hh=hh===""?null:+hh;mm=mm===""?0:+mm;
   const male=document.querySelector("#sex"+sfx+" .on").dataset.v==="1";
   return {y:+v("y"+sfx),m:+v("m"+sfx),d:+v("d"+sfx),hh,mm,male};}
@@ -746,6 +783,7 @@ function _enText(cnt){return cnt===0?'宿命内になく、直接の縁は控え
 function compat(){
   const a=getInputs(""),b=getInputs("2");
   if(!a.y||!a.m||!a.d||!b.y||!b.m||!b.d){alert("二人の年月日を入力してください");return;}
+  {const e=dateErr(a.y,a.m,a.d,"一人目：")||timeErr(a.hh,a.mm,"一人目：")||dateErr(b.y,b.m,b.d,"二人目：")||timeErr(b.hh,b.mm,"二人目：");if(e){alert(e);return;}}
   const A=compute(a.y,a.m,a.d,a.hh,a.mm,a.male),B=compute(b.y,b.m,b.d,b.hh,b.mm,b.male);
   const sc=starCompat(A.honmei,B.honmei);
   const kg=kangou(A.dayStem,B.dayStem);
@@ -784,6 +822,7 @@ function consult(){
   const y=+v("y"),m=+v("m"),d=+v("d");let hh=v("hh"),mm=v("mm");hh=hh===""?null:+hh;mm=mm===""?0:+mm;
   const male=document.querySelector("#sex .on").dataset.v==="1";
   if(!y||!m||!d){alert("あなたの生年月日（上の欄）を入力してください");return;}
+  {const e=dateErr(y,m,d)||timeErr(hh,mm);if(e){alert(e);return;}}
   const P=compute(y,m,d,hh,mm,male);const H=P.honmei,M=P.getsumei;
   const cy=+v("cy")||new Date().getFullYear();const cdir=v("cdir");
   const monthData=(mo)=>{const info=compute(cy,mo,15,12,0,true);const sy=info.solarYear;
@@ -819,6 +858,7 @@ function consultDay(){
   const y=+v("y"),m=+v("m"),d=+v("d");let hh=v("hh"),mm=v("mm");hh=hh===""?null:+hh;mm=mm===""?0:+mm;
   const male=document.querySelector("#sex .on").dataset.v==="1";
   if(!y||!m||!d){alert("あなたの生年月日（上の欄）を入力してください");return;}
+  {const e=dateErr(y,m,d)||timeErr(hh,mm);if(e){alert(e);return;}}
   const P=compute(y,m,d,hh,mm,male);const H=P.honmei,M=P.getsumei;
   const dy=+v("cy")||new Date().getFullYear();const dmo=+v("cmo")||6;const ddd=+v("cdd")||15;
   const tmb=monthBranchAndYear(dy,dmo,ddd);const sy=tmb.solarYear;
@@ -1140,10 +1180,12 @@ function kantei(y,m,d,hh,mm,male,ty){
 }
 function run3(){
   const ty=+v("ty")||new Date().getFullYear();const MARK=["①","②","③"];let cols="";
+  if(!(Number.isInteger(ty)&&ty>=1901&&ty<=2100)){alert("鑑定年は1901〜2100年の整数で入力してください");return;}
   for(let i=1;i<=3;i++){
     const y=+v("y"+i),m=+v("m"+i),d=+v("d"+i);
     if(!y||!m||!d){cols+='<div class="kcol"><div class="khead">鑑定'+MARK[i-1]+'</div><div class="card"><p class="muted">生年月日が未入力です。</p></div></div>';continue;}
     let hh=v("hh"+i),mm=v("mm"+i);hh=hh===""?null:+hh;mm=mm===""?0:+mm;
+    {const e=dateErr(y,m,d)||timeErr(hh,mm);if(e){cols+='<div class="kcol"><div class="khead">鑑定'+MARK[i-1]+'</div><div class="card"><p style="color:#b0393f;font-weight:bold">入力エラー：'+e+'</p></div></div>';continue;}}
     const male=document.querySelector("#sex"+i+" .on").dataset.v==="1";
     cols+='<div class="kcol"><div class="khead">鑑定'+MARK[i-1]+'（'+y+'/'+m+'/'+d+(hh!=null?' '+hh+':'+String(mm).padStart(2,"0"):'')+'・'+(male?"男性":"女性")+'）</div>'+kantei(y,m,d,hh,mm,male,ty)+'</div>';
   }
@@ -1156,7 +1198,7 @@ function run3(){
      修正するときは必ず同じ内容を両方のファイルに反映すること。
    依存する既存関数・定数：DIRS STAR BRANCHES dayIdx honmei yearIdx compute
      monthBranchAndYear monthChartCentral dayCentralStar houiEval sanbanJudge
-     HOUTOKU KYOSATSU_INFO
+     HOUTOKU KYOSATSU_INFO dateErr（2026-11-08〜）
    ============================================================ */
 const HOUI_RAD=Math.PI/180;
 /* 大圏コースの初期方位角（球面三角法）：真北基準0〜360度 */
@@ -1222,7 +1264,7 @@ async function houiGeocode(q){
   return {lon:+js2[0].lon,lat:+js2[0].lat,name:js2[0].display_name||q,src:"OpenStreetMap"};
 }
 /* 方位盤SVG（北が上）：8方位の区切り線・境界角度・行先セクター強調・行先方向の矢印 */
-function houiBanSVG(angle,mode,dirIdx){
+function houiCompassSVG(angle,mode,dirIdx){
   const cx=130,cy=130,r=96;
   const P=(t,rr)=>[+(cx+rr*Math.sin(t*HOUI_RAD)).toFixed(1),+(cy-rr*Math.cos(t*HOUI_RAD)).toFixed(1)];
   const b=houiBounds(mode);
@@ -1270,6 +1312,7 @@ async function calcHoui(){
   const out=document.getElementById("houiOut");
   if(!from||!to){alert("起点住所と行先住所を入力してください");return;}
   if(!qy||!qm||!qd){alert("調べる年月日を入力してください（引っ越し・旅行なら予定日、日常の外出なら今日）");return;}
+  {const e=dateErr(qy,qm,qd,"調べる日：");if(e){alert(e);return;}}
   try{localStorage.setItem("houi_from",from);localStorage.setItem("houi_mag",useMag?"1":"0");localStorage.setItem("houi_div",mode);}catch(e){}
   out.innerHTML='<div class="card"><p class="muted">住所を検索しています…</p></div>';
   let A,B;
@@ -1311,7 +1354,7 @@ async function calcHoui(){
   out.innerHTML='<div class="card"><h2>方位の算出結果</h2>'
     +'<p class="muted">起点：'+A.name+'（'+A.src+'）<br>行先：'+B.name+'（'+B.src+'）<br><span style="font-size:.74rem">※住所検索で見つかった地点です。意図した場所と一致しているか確認してください。地図データ：国土地理院／© OpenStreetMap contributors</span></p>'
     +'<div style="text-align:center;margin:4px 0 0"><span style="font-size:2.4rem;font-weight:bold;color:var(--accent);letter-spacing:.08em">'+dirName+'</span></div>'
-    +houiBanSVG(bearing,mode,si)
+    +houiCompassSVG(bearing,mode,si)
     +'<div class="stars">'
     +'<div class="star"><div class="lbl">方位角（'+(useMag?'磁北補正後':'真北基準')+'）</div><div class="big">'+bearing.toFixed(1)+'度</div>'
     +(useMag?'<div class="lbl">真北基準 '+trueBearing.toFixed(1)+'度／磁気偏角 西偏 '+Math.abs(decl).toFixed(1)+'度</div>':'')+'</div>'
@@ -1337,6 +1380,18 @@ houiInit();
 document.querySelectorAll(".seg").forEach(seg=>seg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
   seg.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");}));
 run3();
+
+/* ===== 印刷 / PDF（2026-11-08 追加）：結果だけを印刷。折りたたみは印刷中だけ開く ===== */
+function printResult(){
+  const has=["result","houiOut"].some(id=>{const e=document.getElementById(id);return e&&e.innerText.trim();});
+  if(!has){alert("先に「3名を鑑定する」などで結果を表示してから印刷してください");return;}
+  const d=new Date(),pd=document.getElementById("printDate");
+  if(pd)pd.textContent="印刷日："+d.getFullYear()+"年"+(d.getMonth()+1)+"月"+d.getDate()+"日";
+  window.print();
+}
+window.addEventListener("beforeprint",()=>{document.querySelectorAll("details:not([open])").forEach(x=>{x.open=true;x.dataset.printOpened="1";});});
+window.addEventListener("afterprint",()=>{document.querySelectorAll("details[data-print-opened]").forEach(x=>{x.open=false;delete x.dataset.printOpened;});});
 </script>
+<button type="button" class="printbtn" onclick="printResult()">印刷 / PDF</button>
 </body>
 </html>

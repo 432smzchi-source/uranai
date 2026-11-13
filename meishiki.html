@@ -330,6 +330,16 @@ function chokoShugoshin(stem,branch){
   if(row===undefined||col===undefined)return{first:"",list:[]};
   const vals=row[col].split(",").map(v=>v.trim()).filter(Boolean);
   return{first:vals[0]||"",list:vals};}
+/* ===== 調候忌神（目安） =====
+   先生の表ではなく、資料「調候守護神１２０通り表」補足の考え方から規則で導出（2026-11-13）：
+   (1)第一守護神を剋す五行の干 (2)夏月(巳午未)は火・木／冬月(亥子丑)は水・金。調候守護神と重なる干は除外。 */
+function chokoKishin(stem,branch){const ck=chokoShugoshin(stem,branch);if(!ck.first)return{list:[],why:[]};
+  const E="木木火火土土金金水水",KOKU={"木":"金","火":"水","土":"木","金":"火","水":"土"},S="甲乙丙丁戊己庚辛壬癸";
+  const set=new Set(),why=[];const fe=E[S.indexOf(ck.first)],ke=KOKU[fe];
+  for(let i=0;i<10;i++)if(E[i]===ke)set.add(S[i]);why.push("第一守護神の"+ck.first+"（"+fe+"）を剋す"+ke+"性");
+  if(branch===5||branch===6||branch===7){"丙丁甲乙".split("").forEach(s=>set.add(s));why.push("夏生まれは暑さを強める火・木");}
+  if(branch===11||branch===0||branch===1){"壬癸庚辛".split("").forEach(s=>set.add(s));why.push("冬生まれは寒さを強める水・金");}
+  return{list:S.split("").filter(s=>set.has(s)&&!ck.list.includes(s)),why};}
 
 /* ===== 全体守護神・忌神（④ uranai3.html と同一ロジック・資料「全体守護神」「忌神」PDF準拠） =====
    陰占（日月年6文字）の五行の過不足で判定。不足(0)＝守護神／過多(3以上)は剋す・洩らす五行が守護神。
@@ -511,8 +521,9 @@ function render(s,y,r){
    $("o_gogyoShugo").innerHTML='<b>陰占五行（蔵干含まず）：</b>'
      +GOGYO.map(g=>'<span style="color:'+ELEM_COLOR[g]+'">'+g+gc[g]+'</span>').join('・')
      +'<br><b>全体守護神：</b>'+(sh.list.length?'<span style="color:#2a5c3a;font-weight:bold">'+sh.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>':'大きな偏りなし')
-     +'<br><b>忌神（いみがみ）：</b>'+(ki.list.length?'<span style="color:#9a5a12;font-weight:bold">'+ki.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>　<span style="color:#8a8378">※過多の五行＋それを生む五行。守護神と重なる五行は守護神を優先</span>':'過多の五行なし（特になし）');
-     +(()=>{const ck=chokoShugoshin(r.day.stem,r.month.branch);return '<br><b>調候守護神：</b><span style="color:#1a5c8a;font-weight:bold"> 第一：'+ck.first+'　全：'+ck.list.join('・')+'</span>　<span style="color:#8a8378">（日干'+STEMS10[r.day.stem]+'×'+BRANCHES12[r.month.branch]+'月）</span>';})();}
+     +'<br><b>忌神（いみがみ）：</b>'+(ki.list.length?'<span style="color:#9a5a12;font-weight:bold">'+ki.list.map(g=>g+'（'+GOGYO_ROLE[g]+'）').join('・')+'</span>　<span style="color:#8a8378">※過多の五行＋それを生む五行。守護神と重なる五行は守護神を優先</span>':'過多の五行なし（特になし）')
+     +(()=>{const ck=chokoShugoshin(r.day.stem,r.month.branch);return '<br><b>調候守護神：</b><span style="color:#1a5c8a;font-weight:bold"> 第一：'+ck.first+'　全：'+ck.list.join('・')+'</span>　<span style="color:#8a8378">（日干'+STEMS10[r.day.stem]+'×'+BRANCHES12[r.month.branch]+'月）</span>';})()
+     +(()=>{const kk=chokoKishin(r.day.stem,r.month.branch);return '<br><b>調候忌神（目安）：</b><span style="color:#9a5a12;font-weight:bold"> '+(kk.list.length?kk.list.join('・'):'なし')+'</span>　<span style="color:#8a8378">※'+kk.why.join('／')+'。調候守護神と重なる干は除く</span>';})();}
   const v=voidBranches(r.day.stem,r.day.branch);
   $("c_tcs").textContent=BRANCHES[v[0]]+" "+BRANCHES[v[1]];
   $("c_tcs_m").textContent=branchMonth(v[0])+"月・"+branchMonth(v[1])+"月";
